@@ -6,7 +6,8 @@ import {
     MessageSquare, Building, GraduationCap,
     Calendar, Sparkles, Briefcase, Zap,
     ChevronRight, MapPin, Star, Clock,
-    FileText, ShieldCheck, X, SlidersHorizontal
+    FileText, ShieldCheck, X, SlidersHorizontal,
+    Compass, Bell, Megaphone, ArrowRight
 } from 'lucide-react';
 import { useUser } from '../../context/UserContext';
 import axios from 'axios';
@@ -21,21 +22,21 @@ const StudentDashboard = () => {
         company: '',
         department: '',
         batch: '',
-        mentorship_available: 'true'
+        mentorship_available: '' // Show all by default
     });
     const [showFilters, setShowFilters] = useState(false);
+    const [activeTab, setActiveTab] = useState('browse');
 
-    // Sync searchTerm to filters.name (simplified for user)
+    // Debounced search logic - Fixes search delay and sync
     useEffect(() => {
-        const delayDebounceFn = setTimeout(() => {
+        const delay = setTimeout(() => {
             setFilters(prev => ({ ...prev, name: searchTerm }));
-        }, 500);
-
-        return () => clearTimeout(delayDebounceFn);
+        }, 300);
+        return () => clearTimeout(delay);
     }, [searchTerm]);
 
-    // Fetch Alumni with React Query
-    const { data: alumni = [], isLoading, isFetching } = useQuery({
+    // Fetch Alumni with real-time sync
+    const { data: alumni = [], isLoading } = useQuery({
         queryKey: ['alumni', filters],
         queryFn: async () => {
             const queryParams = new URLSearchParams(filters).toString();
@@ -45,15 +46,16 @@ const StudentDashboard = () => {
             return data;
         },
         enabled: !!user.token,
+        refetchInterval: 10000,
     });
 
     const [selectedAlumni, setSelectedAlumni] = useState(null);
     const [requestData, setRequestData] = useState({ purpose: 'career_guidance', message: '' });
 
     const connectMutation = useMutation({
-        mutationFn: async ({ alumniId, ...details }) => {
+        mutationFn: async (details) => {
             return axios.post('/api/student/request-mentorship',
-                { alumni_id: alumniId, ...details },
+                { alumni_id: details.alumniId, purpose: details.purpose, message: details.message },
                 { headers: { 'Authorization': `Bearer ${user.token}` } }
             );
         },
@@ -74,352 +76,294 @@ const StudentDashboard = () => {
     };
 
     return (
-        <div className="space-y-12 pb-24 max-w-[1400px] mx-auto">
-            {/* Mentorship Request Modal */}
+        <div className="flex flex-col xl:flex-row gap-10 items-start">
+            {/* Sidebar Navigation */}
+            <aside className="w-full xl:w-80 space-y-6 sticky top-32">
+                <div className="bg-white/70 backdrop-blur-2xl rounded-[3rem] p-8 shadow-[0_20px_50px_rgba(0,0,0,0.05)] border border-white/40">
+                    <div className="flex items-center gap-4 mb-10 px-2">
+                        <div className="w-12 h-12 bg-primary-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-primary-200">
+                            <Compass className="w-6 h-6" />
+                        </div>
+                        <div>
+                            <h2 className="text-xl font-black text-slate-900 tracking-tighter uppercase">Student Hub</h2>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mt-1">Version 2.0.4</p>
+                        </div>
+                    </div>
+
+                    <nav className="space-y-2">
+                        {[
+                            { id: 'browse', label: 'Explore Network', icon: Users },
+                            { id: 'my_requests', label: 'Active Pursuits', icon: Zap },
+                            { id: 'bulletin', label: 'Bulletin Board', icon: Megaphone }
+                        ].map((item) => (
+                            <button
+                                key={item.id}
+                                onClick={() => setActiveTab(item.id)}
+                                className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all duration-300 ${activeTab === item.id ? 'bg-slate-900 text-white shadow-2xl shadow-slate-300 translate-x-3' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'}`}
+                            >
+                                <item.icon className={`w-4 h-4 ${activeTab === item.id ? 'text-primary-400' : ''}`} />
+                                {item.label}
+                            </button>
+                        ))}
+                    </nav>
+
+                    <div className="mt-12 pt-8 border-t border-slate-100">
+                        <div className="bg-gradient-to-br from-indigo-600 to-primary-600 rounded-[2rem] p-6 text-white overflow-hidden relative group">
+                            <div className="relative z-10">
+                                <Sparkles className="w-10 h-10 mb-4 text-white/50" />
+                                <h4 className="text-sm font-black uppercase tracking-widest mb-2">Build Network</h4>
+                                <p className="text-[11px] font-medium leading-relaxed text-white/80 transition-opacity">Connect with high-impact alumni to accelerate your career path.</p>
+                            </div>
+                            <div className="absolute -right-8 -bottom-8 w-24 h-24 bg-white/20 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700"></div>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            {/* Main Content Area */}
+            <main className="flex-1 w-full space-y-10">
+                {activeTab === 'browse' && (
+                    <>
+                        {/* Integrated Premium Search & Filter Bar */}
+                        <div className="bg-white/80 backdrop-blur-2xl p-4 rounded-[3rem] shadow-2xl border border-white/60 flex flex-col md:flex-row items-center gap-4 relative z-50">
+                            <div className="relative flex-1 group w-full">
+                                <div className="absolute left-7 top-1/2 -translate-y-1/2 flex items-center gap-3">
+                                    <Search className="w-5 h-5 text-slate-400 group-focus-within:text-primary-600 transition-colors" />
+                                    <div className="w-[1px] h-6 bg-slate-200"></div>
+                                </div>
+                                <input
+                                    type="text"
+                                    placeholder="Search by name, role or expertise..."
+                                    className="w-full pl-20 pr-8 py-6 bg-slate-50/50 border-none rounded-[2rem] focus:ring-4 focus:ring-primary-500/10 outline-none font-bold text-slate-700 placeholder:text-slate-400 transition-all text-sm"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                />
+                            </div>
+                            <button
+                                onClick={() => setShowFilters(!showFilters)}
+                                className={`flex items-center gap-3 px-10 py-6 rounded-[2rem] font-black text-[10px] uppercase tracking-[0.2em] transition-all ${showFilters ? 'bg-primary-600 text-white shadow-xl shadow-primary-200' : 'bg-slate-900 text-white shadow-xl'}`}
+                            >
+                                <SlidersHorizontal className="w-4 h-4" />
+                                {showFilters ? 'Hide Logic' : 'Advanced Filters'}
+                            </button>
+                        </div>
+
+                        {/* Expandable Filter UI */}
+                        <AnimatePresence>
+                            {showFilters && (
+                                <motion.div
+                                    initial={{ height: 0, opacity: 0, scaleY: 0.9 }}
+                                    animate={{ height: 'auto', opacity: 1, scaleY: 1 }}
+                                    exit={{ height: 0, opacity: 0, scaleY: 0.9 }}
+                                    className="overflow-hidden origin-top"
+                                >
+                                    <div className="bg-white rounded-[3rem] p-10 shadow-2xl border border-slate-100 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-4">
+                                        <div className="space-y-3">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Target Company</label>
+                                            <input
+                                                type="text"
+                                                placeholder="e.g. Microsoft"
+                                                className="w-full px-8 py-4 bg-slate-50 rounded-2xl border-none focus:ring-4 focus:ring-primary-100 outline-none font-bold text-slate-600 text-xs"
+                                                value={filters.company}
+                                                onChange={(e) => setFilters({ ...filters, company: e.target.value })}
+                                            />
+                                        </div>
+                                        <div className="space-y-3">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Field / Dept</label>
+                                            <select
+                                                className="w-full px-8 py-4 bg-slate-50 rounded-2xl border-none focus:ring-4 focus:ring-primary-100 outline-none font-bold text-slate-600 appearance-none cursor-pointer text-xs"
+                                                value={filters.department}
+                                                onChange={(e) => setFilters({ ...filters, department: e.target.value })}
+                                            >
+                                                <option value="">All Streams</option>
+                                                <option value="CSE">CSE / IT</option>
+                                                <option value="ECE">ECE / EEE</option>
+                                                <option value="MECH">Mechanical</option>
+                                                <option value="CIVIL">Civil</option>
+                                            </select>
+                                        </div>
+                                        <div className="space-y-3">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Availability Loop</label>
+                                            <select
+                                                className="w-full px-8 py-4 bg-slate-50 rounded-2xl border-none focus:ring-4 focus:ring-primary-100 outline-none font-bold text-slate-600 appearance-none cursor-pointer text-xs"
+                                                value={filters.mentorship_available}
+                                                onChange={(e) => setFilters({ ...filters, mentorship_available: e.target.value })}
+                                            >
+                                                <option value="">Global Search</option>
+                                                <option value="true">Open for Mentorship</option>
+                                            </select>
+                                        </div>
+                                        <div className="flex items-end">
+                                            <button
+                                                onClick={() => {
+                                                    setSearchTerm('');
+                                                    setFilters({ name: '', company: '', department: '', batch: '', mentorship_available: '' });
+                                                }}
+                                                className="w-full py-4 bg-slate-900 text-white hover:bg-primary-600 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg"
+                                            >
+                                                Reset Engine
+                                            </button>
+                                        </div>
+                                    </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+
+                        {/* Elite Results Grid */}
+                        <div className="grid md:grid-cols-2 2xl:grid-cols-3 gap-10">
+                            {isLoading ? (
+                                [1, 2, 3, 4, 5, 6].map(i => (
+                                    <div key={i} className="h-96 bg-white/40 animate-pulse rounded-[4rem] border border-white"></div>
+                                ))
+                            ) : alumni.length > 0 ? (
+                                <AnimatePresence mode="popLayout">
+                                    {alumni.map((person, i) => (
+                                        <motion.div
+                                            key={person.id}
+                                            layout
+                                            initial={{ opacity: 0, scale: 0.9, y: 30 }}
+                                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                                            exit={{ opacity: 0, scale: 0.9 }}
+                                            transition={{ delay: i * 0.03 }}
+                                            whileHover={{ y: -15 }}
+                                            className="bg-white rounded-[4rem] p-10 shadow-xl border border-slate-100 hover:border-primary-200 transition-all group overflow-hidden relative"
+                                        >
+                                            <div className="absolute top-0 right-0 w-40 h-40 bg-primary-600/5 rounded-full -mr-20 -mt-20 blur-3xl group-hover:bg-primary-600/10 transition-colors duration-500"></div>
+
+                                            <div className="flex items-center gap-6 mb-10 relative z-10">
+                                                <div className="w-24 h-24 bg-gradient-to-br from-slate-900 to-slate-800 rounded-[2.5rem] flex items-center justify-center text-white font-black text-4xl group-hover:rotate-6 transition-transform shadow-2xl">
+                                                    {person.name.charAt(0)}
+                                                </div>
+                                                <div>
+                                                    <h4 className="text-2xl font-black text-slate-900 tracking-tighter uppercase mb-1 leading-none">{person.name}</h4>
+                                                    <p className="text-[9px] font-black text-primary-600 uppercase tracking-[0.2em] mb-3">{person.job_role}</p>
+                                                    {person.mentorship_available && (
+                                                        <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-50 rounded-full border border-emerald-100">
+                                                            <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
+                                                            <span className="text-[8px] font-black text-emerald-600 uppercase tracking-widest">Active Mentor</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-4 mb-10 relative z-10">
+                                                <div className="flex items-center gap-4 p-4 bg-slate-50/50 rounded-3xl border border-slate-100 group-hover:bg-white transition-colors">
+                                                    <Building className="w-5 h-5 text-indigo-500" />
+                                                    <div className="flex flex-col">
+                                                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-[0.2em]">Company</span>
+                                                        <span className="text-sm font-black text-slate-700">{person.company || 'Tech Leader'}</span>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-4 p-4 bg-slate-50/50 rounded-3xl border border-slate-100 group-hover:bg-white transition-colors">
+                                                    <GraduationCap className="w-5 h-5 text-primary-500" />
+                                                    <div className="flex flex-col">
+                                                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-[0.2em]">Academic Loop</span>
+                                                        <span className="text-sm font-black text-slate-700">{person.department} • Class of {person.batch}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <button
+                                                onClick={() => setSelectedAlumni(person)}
+                                                className="w-full py-6 bg-slate-900 text-white rounded-[2.5rem] font-black text-[10px] uppercase tracking-[0.3em] hover:bg-primary-600 shadow-2xl transition-all active:scale-95 flex items-center justify-center gap-3 group/btn"
+                                            >
+                                                Initialize Pursuit <ArrowRight className="w-4 h-4 group-hover/btn:translate-x-2 transition-transform" />
+                                            </button>
+                                        </motion.div>
+                                    ))}
+                                </AnimatePresence>
+                            ) : (
+                                <motion.div
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    className="col-span-full py-40 text-center bg-white/40 rounded-[5rem] border-4 border-dashed border-white"
+                                >
+                                    <div className="w-24 h-24 bg-white shadow-2xl rounded-[2.5rem] flex items-center justify-center mx-auto mb-10">
+                                        <Search className="w-10 h-10 text-slate-200" />
+                                    </div>
+                                    <h3 className="text-4xl font-black text-slate-900 uppercase tracking-tighter mb-4">No Connections Formed</h3>
+                                    <p className="text-slate-500 font-bold text-lg max-w-sm mx-auto leading-relaxed">The search engine couldn't find matches. Try broadening your criteria.</p>
+                                    <button
+                                        onClick={() => {
+                                            setSearchTerm('');
+                                            setFilters({ name: '', company: '', department: '', batch: '', mentorship_available: '' });
+                                        }}
+                                        className="mt-12 px-12 py-5 bg-slate-900 text-white rounded-full font-black uppercase tracking-widest text-xs hover:bg-primary-600 transition-all shadow-2xl"
+                                    >
+                                        Reset Search Loop
+                                    </button>
+                                </motion.div>
+                            )}
+                        </div>
+                    </>
+                )}
+
+                {activeTab === 'bulletin' && <BulletinBoard />}
+                {activeTab === 'my_requests' && (
+                    <div className="py-40 text-center bg-white rounded-[5rem] border shadow-xl">
+                        <Zap className="w-24 h-24 text-slate-200 animate-pulse mx-auto mb-10" />
+                        <h2 className="text-5xl font-black text-slate-900 tracking-tighter uppercase mb-6">Synchronization In Progress</h2>
+                        <p className="text-slate-500 font-bold text-lg max-w-lg mx-auto leading-relaxed">Your active mentorship pursuits are being synced with the secure cloud repository.</p>
+                        <button onClick={() => setActiveTab('browse')} className="mt-12 px-12 py-5 bg-slate-900 text-white rounded-full font-black uppercase tracking-widest text-xs hover:bg-primary-600 transition-all shadow-2xl">Return to Exploration</button>
+                    </div>
+                )}
+            </main>
+
+            {/* Modal: Pursuit Initialization */}
             <AnimatePresence>
                 {selectedAlumni && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+                    <div className="fixed inset-0 z-[1000] flex items-center justify-center p-6">
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setSelectedAlumni(null)} className="absolute inset-0 bg-slate-900/80 backdrop-blur-xl" />
                         <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            onClick={() => setSelectedAlumni(null)}
-                            className="absolute inset-0 bg-slate-900/40 backdrop-blur-md"
-                        />
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                            className="bg-white w-full max-w-lg rounded-[3rem] shadow-2xl relative z-10 overflow-hidden"
+                            initial={{ opacity: 0, scale: 0.8, rotateX: 20 }}
+                            animate={{ opacity: 1, scale: 1, rotateX: 0 }}
+                            exit={{ opacity: 0, scale: 0.8, rotateX: 20 }}
+                            className="bg-white w-full max-w-xl rounded-[4rem] shadow-2xl relative z-10 overflow-hidden"
                         >
-                            <div className="p-10">
-                                <h3 className="text-3xl font-black text-slate-900 uppercase tracking-tight mb-2">Connect with Mentor</h3>
-                                <p className="text-slate-500 font-bold text-sm mb-8">Requesting guidance from <span className="text-primary-600">{selectedAlumni.name}</span></p>
+                            <div className="p-12">
+                                <header className="flex justify-between items-start mb-12">
+                                    <div>
+                                        <h3 className="text-4xl font-black text-slate-900 uppercase tracking-tighter mb-2 leading-none">Initialize Pursuit</h3>
+                                        <p className="text-slate-500 font-bold text-sm">Target: <span className="text-primary-600 uppercase tracking-widest">{selectedAlumni.name}</span></p>
+                                    </div>
+                                    <button onClick={() => setSelectedAlumni(null)} className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-900 transition-all">
+                                        <X className="w-6 h-6" />
+                                    </button>
+                                </header>
 
-                                <form onSubmit={handleRequestSubmit} className="space-y-6">
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Select Purpose</label>
-                                        <div className="grid grid-cols-1 gap-3">
-                                            {[
-                                                { id: 'resume_review', label: 'Resume Review', icon: FileText },
-                                                { id: 'career_guidance', label: 'Career Guidance', icon: Zap },
-                                                { id: 'interview_prep', label: 'Interview Prep', icon: ShieldCheck }
-                                            ].map((p) => (
+                                <form onSubmit={handleRequestSubmit} className="space-y-10">
+                                    <div className="space-y-4">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-6">Engagement Protocol</label>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            {['career_guidance', 'resume_review', 'interview_prep', 'referral'].map(mode => (
                                                 <button
-                                                    key={p.id}
+                                                    key={mode}
                                                     type="button"
-                                                    onClick={() => setRequestData({ ...requestData, purpose: p.id })}
-                                                    className={`flex items-center gap-4 p-4 rounded-2xl border-2 transition-all text-left ${requestData.purpose === p.id ? 'border-primary-600 bg-primary-50 text-primary-900' : 'border-slate-100 bg-slate-50 text-slate-500 hover:border-slate-200'}`}
+                                                    onClick={() => setRequestData({ ...requestData, purpose: mode })}
+                                                    className={`py-4 px-6 rounded-2xl text-[10px] uppercase font-black tracking-widest transition-all border-2 ${requestData.purpose === mode ? 'bg-slate-900 text-white border-slate-900 shadow-xl' : 'bg-white text-slate-500 border-slate-100 hover:border-primary-100'}`}
                                                 >
-                                                    <p.icon className={`w-5 h-5 ${requestData.purpose === p.id ? 'text-primary-600' : 'text-slate-400'}`} />
-                                                    <span className="font-bold">{p.label}</span>
+                                                    {mode.replace('_', ' ')}
                                                 </button>
                                             ))}
                                         </div>
                                     </div>
-
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Personal Message</label>
+                                    <div className="space-y-4">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-6">Personalized Message</label>
                                         <textarea
-                                            placeholder="Write a brief note about why you're reaching out..."
-                                            className="w-full p-5 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none transition-all font-medium text-slate-700 min-h-[120px]"
+                                            className="w-full p-8 bg-slate-50/80 rounded-[2.5rem] border-none focus:ring-4 focus:ring-primary-500/10 outline-none font-bold text-sm min-h-[160px] placeholder:text-slate-300"
+                                            placeholder="Introduce yourself with impact..."
                                             value={requestData.message}
                                             onChange={(e) => setRequestData({ ...requestData, message: e.target.value })}
                                             required
                                         />
                                     </div>
-
-                                    <div className="flex gap-4 pt-4">
-                                        <button
-                                            type="button"
-                                            onClick={() => setSelectedAlumni(null)}
-                                            className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-200 transition-all font-bold"
-                                        >
-                                            Cancel
-                                        </button>
-                                        <button
-                                            type="submit"
-                                            disabled={connectMutation.isPending}
-                                            className="flex-1 py-4 bg-primary-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-primary-700 shadow-xl shadow-primary-200 transition-all disabled:opacity-50 font-bold"
-                                        >
-                                            {connectMutation.isPending ? 'Sending...' : 'Send Request'}
-                                        </button>
-                                    </div>
+                                    <button type="submit" className="w-full py-7 bg-slate-900 text-white rounded-[2.5rem] font-black text-xs uppercase tracking-[0.4em] hover:bg-primary-600 shadow-2xl shadow-slate-200 transition-all active:scale-95">Send Pulsar Request</button>
                                 </form>
                             </div>
                         </motion.div>
                     </div>
                 )}
             </AnimatePresence>
-
-            {/* Dynamic Welcome Header */}
-            <header className="relative p-12 rounded-[3.5rem] bg-slate-900 text-white overflow-hidden shadow-2xl group">
-                <div className="absolute inset-0 bg-gradient-to-br from-indigo-600/30 via-primary-600/30 to-transparent"></div>
-                <div className="absolute -top-24 -right-24 w-96 h-96 bg-primary-600/20 rounded-full blur-[100px] group-hover:bg-primary-600/30 transition-all duration-1000"></div>
-
-                <div className="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-12">
-                    <div className="space-y-6 text-center lg:text-left">
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.9 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            className="inline-flex items-center gap-3 px-6 py-2 bg-white/10 backdrop-blur-xl border border-white/20 rounded-full text-xs font-black uppercase tracking-widest"
-                        >
-                            <Sparkles className="w-4 h-4 text-yellow-400" /> Discover Your Future
-                        </motion.div>
-                        <h1 className="text-5xl md:text-7xl font-black tracking-tight leading-[0.9]">
-                            Find Your <br /><span className="text-primary-400">Elite Mentor.</span>
-                        </h1>
-                        <p className="text-slate-300 text-xl max-w-xl font-medium">
-                            The alumni network is now live. Connect with global leaders from {alumni.length > 0 ? "various" : "top"} industries.
-                        </p>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-white/5 backdrop-blur-2xl p-8 rounded-[2.5rem] border border-white/10 text-center flex flex-col items-center justify-center">
-                            <Users className="w-8 h-8 mb-3 text-primary-400" />
-                            <div className="text-3xl font-black">{alumni.length}</div>
-                            <div className="text-[10px] text-slate-400 uppercase font-black tracking-widest mt-1">Ready to Mentor</div>
-                        </div>
-                        <div className="bg-primary-600 p-8 rounded-[2.5rem] shadow-xl shadow-primary-500/30 text-center flex flex-col items-center justify-center">
-                            <Zap className="w-8 h-8 mb-3 text-white" />
-                            <div className="text-3xl font-black">2.4k</div>
-                            <div className="text-[10px] text-primary-100 uppercase font-black tracking-widest mt-1">Connections Made</div>
-                        </div>
-                    </div>
-                </div>
-            </header>
-
-            {/* Announcements */}
-            <BulletinBoard />
-
-            {/* Perfect Search & Filters */}
-            <div className="sticky top-24 z-40">
-                <div className="bg-white/80 backdrop-blur-2xl p-4 rounded-[2.5rem] shadow-2xl border border-slate-100">
-                    <div className="flex flex-col md:flex-row gap-4">
-                        <div className="flex-1 relative group">
-                            <div className="absolute left-6 top-1/2 -translate-y-1/2 flex items-center gap-3">
-                                {isFetching && <div className="w-4 h-4 border-2 border-primary-600 border-t-transparent animate-spin rounded-full"></div>}
-                                <Search className={`w-5 h-5 ${isFetching ? 'hidden' : 'text-slate-400'} group-focus-within:text-primary-600 transition-colors`} />
-                            </div>
-                            <input
-                                type="text"
-                                placeholder="Search by name, company, role or skills..."
-                                className="w-full pl-14 pr-6 py-5 bg-slate-50 border-2 border-slate-100 rounded-[2rem] focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 focus:bg-white outline-none transition-all font-bold text-slate-700 text-lg"
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                            />
-                            {searchTerm && (
-                                <button
-                                    onClick={() => setSearchTerm('')}
-                                    className="absolute right-6 top-1/2 -translate-y-1/2 p-2 hover:bg-slate-200 rounded-full transition-colors"
-                                >
-                                    <X className="w-4 h-4 text-slate-400" />
-                                </button>
-                            )}
-                        </div>
-
-                        <div className="flex gap-3">
-                            <button
-                                onClick={() => setShowFilters(!showFilters)}
-                                className={`px-8 py-5 rounded-[2rem] font-black text-sm uppercase tracking-widest flex items-center gap-3 transition-all border-2 ${showFilters ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-700 border-slate-100 hover:border-slate-200'}`}
-                            >
-                                <SlidersHorizontal className="w-5 h-5" /> Filters
-                            </button>
-                            <button
-                                onClick={() => setFilters({ ...filters, mentorship_available: filters.mentorship_available === 'true' ? '' : 'true' })}
-                                className={`px-8 py-5 rounded-[2rem] font-black text-sm uppercase tracking-widest flex items-center gap-3 transition-all border-2 ${filters.mentorship_available === 'true' ? 'bg-primary-600 text-white border-primary-600 shadow-xl shadow-primary-200' : 'bg-white text-slate-700 border-slate-100 hover:border-primary-500'}`}
-                            >
-                                <ShieldCheck className={`w-5 h-5 ${filters.mentorship_available === 'true' ? 'text-yellow-300' : 'text-primary-500'}`} />
-                                Available Only
-                            </button>
-                        </div>
-                    </div>
-
-                    <AnimatePresence>
-                        {showFilters && (
-                            <motion.div
-                                initial={{ height: 0, opacity: 0 }}
-                                animate={{ height: 'auto', opacity: 1 }}
-                                exit={{ height: 0, opacity: 0 }}
-                                className="overflow-hidden border-t border-slate-100 mt-4"
-                            >
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6 pb-2">
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Industry/Company</label>
-                                        <input
-                                            type="text"
-                                            placeholder="e.g. Google, Microsoft"
-                                            className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:border-primary-500 outline-none font-bold text-slate-600"
-                                            value={filters.company}
-                                            onChange={(e) => setFilters({ ...filters, company: e.target.value })}
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Department</label>
-                                        <select
-                                            className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:border-primary-500 outline-none font-bold text-slate-600 cursor-pointer"
-                                            value={filters.department}
-                                            onChange={(e) => setFilters({ ...filters, department: e.target.value })}
-                                        >
-                                            <option value="">All Departments</option>
-                                            <option value="CSE">CSE</option>
-                                            <option value="ECE">ECE</option>
-                                            <option value="IT">IT</option>
-                                            <option value="MECH">Mechanical</option>
-                                            <option value="CIVIL">Civil</option>
-                                        </select>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Batch Year</label>
-                                        <input
-                                            type="text"
-                                            placeholder="e.g. 2022"
-                                            className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:border-primary-500 outline-none font-bold text-slate-600"
-                                            value={filters.batch}
-                                            onChange={(e) => setFilters({ ...filters, batch: e.target.value })}
-                                        />
-                                    </div>
-                                </div>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
-                </div>
-            </div>
-
-            {/* Alumni Grid */}
-            <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-10">
-                {isLoading ? (
-                    [1, 2, 3, 4, 5, 6].map(i => (
-                        <div key={i} className="h-[450px] bg-white rounded-[3rem] shadow-sm animate-pulse flex flex-col p-10 space-y-6 border border-slate-100">
-                            <div className="flex justify-between">
-                                <div className="w-24 h-24 bg-slate-100 rounded-3xl"></div>
-                                <div className="w-12 h-12 bg-slate-100 rounded-2xl"></div>
-                            </div>
-                            <div className="h-10 bg-slate-100 rounded-xl w-3/4"></div>
-                            <div className="h-4 bg-slate-100 rounded-xl w-1/2"></div>
-                            <div className="flex-1 space-y-4 pt-6">
-                                <div className="h-12 bg-slate-50 rounded-2xl"></div>
-                                <div className="h-12 bg-slate-50 rounded-2xl"></div>
-                            </div>
-                            <div className="h-16 bg-slate-100 rounded-3xl"></div>
-                        </div>
-                    ))
-                ) : (
-                    <AnimatePresence mode="popLayout">
-                        {alumni.map((person) => (
-                            <motion.div
-                                layout
-                                key={person.id}
-                                initial={{ opacity: 0, y: 30 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, scale: 0.9 }}
-                                whileHover={{ y: -12, transition: { duration: 0.3 } }}
-                                className="relative bg-white p-10 rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.05)] border border-slate-100 hover:border-primary-200 hover:shadow-[0_40px_80px_rgba(0,0,0,0.1)] transition-all group overflow-hidden"
-                            >
-                                {/* Status Chip */}
-                                <div className="absolute top-10 right-10 flex items-center gap-2 px-3 py-1.5 bg-emerald-50 rounded-full border border-emerald-100">
-                                    <span className="flex h-2 w-2 relative">
-                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                                    </span>
-                                    <span className="text-[9px] font-black uppercase text-emerald-600 tracking-tighter">Verified</span>
-                                </div>
-
-                                <div className="flex items-start gap-8 mb-10">
-                                    <div className="relative">
-                                        <div className="w-24 h-24 bg-slate-900 rounded-[2rem] flex items-center justify-center text-white font-black text-4xl shadow-2xl transform -rotate-6 group-hover:rotate-0 transition-transform duration-500 relative z-10">
-                                            {person.name.charAt(0)}
-                                        </div>
-                                        <div className="absolute inset-0 bg-primary-600 rounded-[2rem] blur-xl opacity-0 group-hover:opacity-20 transition-opacity"></div>
-                                        {person.mentorship_available && (
-                                            <div className="absolute -bottom-3 -right-3 bg-primary-600 p-2 rounded-2xl shadow-xl border-4 border-white z-20">
-                                                <Star className="w-4 h-4 text-white fill-white" />
-                                            </div>
-                                        )}
-                                    </div>
-                                    <div className="pt-2">
-                                        <h3 className="text-3xl font-black text-slate-900 leading-none group-hover:text-primary-600 transition-colors uppercase tracking-tighter mb-2">
-                                            {person.name}
-                                        </h3>
-                                        <p className="text-primary-600 font-black text-xs uppercase tracking-[0.15em] opacity-80">
-                                            {person.job_role}
-                                        </p>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-4 mb-10">
-                                    <div className="flex items-center gap-4 p-4 bg-slate-50/50 rounded-[1.5rem] border border-slate-100 group-hover:bg-white transition-colors">
-                                        <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm border border-slate-100 text-slate-400 group-hover:text-indigo-600 transition-colors">
-                                            <Building className="w-5 h-5" />
-                                        </div>
-                                        <div>
-                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Company</p>
-                                            <span className="text-sm font-black text-slate-700">{person.company || 'Confidential'}</span>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex items-center gap-4 p-4 bg-slate-50/50 rounded-[1.5rem] border border-slate-100 group-hover:bg-white transition-colors">
-                                        <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm border border-slate-100 text-slate-400 group-hover:text-blue-600 transition-colors">
-                                            <GraduationCap className="w-5 h-5" />
-                                        </div>
-                                        <div>
-                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Background</p>
-                                            <span className="text-sm font-black text-slate-700">{person.department} • {person.batch}</span>
-                                        </div>
-                                    </div>
-
-                                    {/* Advanced Skills Grid */}
-                                    <div className="flex flex-wrap gap-2 pt-2">
-                                        {(person.skills || ['Leadership', 'Mentorship']).map((skill, i) => (
-                                            <span key={i} className="px-4 py-2 bg-slate-100 text-slate-500 rounded-xl text-[10px] font-black uppercase tracking-widest border border-slate-200 group-hover:bg-primary-50 group-hover:text-primary-600 group-hover:border-primary-100 transition-colors">
-                                                {skill}
-                                            </span>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                <div className="flex gap-4">
-                                    <button
-                                        onClick={() => setSelectedAlumni(person)}
-                                        className="flex-[2] py-5 bg-slate-900 text-white rounded-[2rem] font-black text-xs uppercase tracking-[0.2em] hover:bg-primary-600 shadow-2xl hover:shadow-primary-600/30 transition-all flex items-center justify-center gap-3 group/btn active:scale-95 disabled:opacity-50"
-                                    >
-                                        <UserPlus className="w-5 h-5 group-hover/btn:rotate-12 transition-transform" />
-                                        Request Pursuit
-                                    </button>
-                                    <button className="flex-1 py-5 bg-slate-50 text-slate-800 rounded-[2rem] font-black text-xs uppercase tracking-widest hover:bg-slate-100 transition-all active:scale-95 border border-slate-200">
-                                        Profile
-                                    </button>
-                                </div>
-                            </motion.div>
-                        ))}
-                    </AnimatePresence>
-                )}
-            </div>
-
-            {!isLoading && alumni.length === 0 && (
-                <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="col-span-full py-40 text-center bg-white rounded-[4rem] border-4 border-dashed border-slate-100"
-                >
-                    <div className="w-32 h-32 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-10">
-                        <Search className="w-16 h-16 text-slate-200" />
-                    </div>
-                    <h3 className="text-4xl font-black text-slate-900 mb-4 tracking-tighter uppercase">No matches found</h3>
-                    <p className="text-slate-400 max-w-sm mx-auto font-bold text-lg leading-relaxed">
-                        The elite network is vast, but we couldn't find this specific combination. Resetting your filters might reveal hidden opportunities.
-                    </p>
-                    <button
-                        onClick={() => {
-                            setSearchTerm('');
-                            setFilters({ name: '', company: '', department: '', batch: '', mentorship_available: '' });
-                        }}
-                        className="mt-12 px-10 py-5 bg-slate-900 text-white rounded-full font-black uppercase tracking-widest text-xs hover:bg-primary-600 transition-all shadow-xl"
-                    >
-                        Reset All Filters
-                    </button>
-                </motion.div>
-            )}
         </div>
     );
 };

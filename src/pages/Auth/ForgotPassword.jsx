@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mail, Lock, ArrowLeft, ArrowRight, KeyRound, CheckCircle2, ShieldCheck, Smartphone } from 'lucide-react';
+import { Mail, Lock, ArrowLeft, ArrowRight, KeyRound, CheckCircle2, ShieldCheck, Smartphone, Eye, EyeOff } from 'lucide-react';
 import { forgotPassword, resetPassword } from '../../services/authService';
 
 const ForgotPassword = () => {
@@ -13,6 +13,9 @@ const ForgotPassword = () => {
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
     const [loading, setLoading] = useState(false);
+    const [showOldPassword, setShowOldPassword] = useState(false);
+    const [showNewPassword, setShowNewPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
     const handleEmailSubmit = async (e) => {
         e.preventDefault();
@@ -220,13 +223,20 @@ const ForgotPassword = () => {
                                             <div className="relative group">
                                                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-primary-500 transition-colors" />
                                                 <input
-                                                    type="password"
+                                                    type={showOldPassword ? "text" : "password"}
                                                     required
                                                     placeholder="••••••••"
                                                     value={formData.oldPassword}
                                                     onChange={(e) => setFormData({ ...formData, oldPassword: e.target.value })}
-                                                    className={inputClasses}
+                                                    className={inputClasses + " pr-12"}
                                                 />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowOldPassword(!showOldPassword)}
+                                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-1"
+                                                >
+                                                    {showOldPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                                                </button>
                                             </div>
                                         </div>
                                     )}
@@ -237,13 +247,20 @@ const ForgotPassword = () => {
                                             <div className="relative group">
                                                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-primary-500 transition-colors" />
                                                 <input
-                                                    type="password"
+                                                    type={showNewPassword ? "text" : "password"}
                                                     required
                                                     placeholder="••••••••"
                                                     value={formData.newPassword}
                                                     onChange={(e) => setFormData({ ...formData, newPassword: e.target.value })}
-                                                    className={inputClasses}
+                                                    className={inputClasses + " pr-12"}
                                                 />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowNewPassword(!showNewPassword)}
+                                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-1"
+                                                >
+                                                    {showNewPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                                                </button>
                                             </div>
                                         </div>
                                         <div className="space-y-2">
@@ -251,13 +268,20 @@ const ForgotPassword = () => {
                                             <div className="relative group">
                                                 <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-primary-500 transition-colors" />
                                                 <input
-                                                    type="password"
+                                                    type={showConfirmPassword ? "text" : "password"}
                                                     required
                                                     placeholder="••••••••"
                                                     value={formData.confirmPassword}
                                                     onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                                                    className={inputClasses}
+                                                    className={inputClasses + " pr-12"}
                                                 />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-1"
+                                                >
+                                                    {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                                                </button>
                                             </div>
                                         </div>
                                     </div>
