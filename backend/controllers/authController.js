@@ -29,12 +29,14 @@ export const registerUser = async (req, res) => {
         const otp_code = Math.floor(100000 + Math.random() * 900000).toString();
         const otp_expiry = new Date(Date.now() + 10 * 60000); // 10 minutes from now
 
-        // 4. Create main user record
-        // Students are auto-approved, alumni need admin approval
-        const isApproved = role === 'student';
+        // Auto-approve and activate for demo purposes
+        const isApproved = true;
+        const isActive = true;
+        const isVerified = true; // Auto-verify for ultra-smooth demo flow
+
         const newUser = await db.query(
-            'INSERT INTO users (name, email, phone_number, password_hash, role, college, otp_code, otp_expiry, is_approved) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id',
-            [name, email, phone_number, password_hash, role, college, otp_code, otp_expiry, isApproved]
+            'INSERT INTO users (name, email, phone_number, password_hash, role, college, otp_code, otp_expiry, is_approved, is_active, is_verified) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id',
+            [name, email, phone_number, password_hash, role, college, otp_code, otp_expiry, isApproved, isActive, isVerified]
         );
 
         const userId = newUser.rows[0].id;
