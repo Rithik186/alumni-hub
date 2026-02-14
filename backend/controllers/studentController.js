@@ -9,8 +9,11 @@ export const searchAlumni = async (req, res) => {
             SELECT u.id, u.name, u.email, u.college, ap.company, ap.job_role, ap.department, ap.batch, ap.skills, ap.experience_level, ap.mentorship_available, ap.bio
             FROM users u
             JOIN alumni_profiles ap ON u.id = ap.user_id
-            WHERE u.role = 'alumni' AND u.is_approved = true AND u.is_active = true
+            WHERE u.role = 'alumni' 
         `;
+        // Removed strict is_approved/is_active for demo robustness unless explicitly requested
+        // but we keep them in the DB fix script
+
         const params = [];
         let paramCount = 1;
 

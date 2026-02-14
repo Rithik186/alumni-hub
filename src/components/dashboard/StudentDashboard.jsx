@@ -2,12 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-    Search, Filter, Users, UserPlus, Check,
-    MessageSquare, Building, GraduationCap,
-    Calendar, Sparkles, Briefcase, Zap,
-    ChevronRight, MapPin, Star, Clock,
-    FileText, ShieldCheck, X, SlidersHorizontal,
-    Compass, Bell, Megaphone, ArrowRight
+    Search, Users, Building, GraduationCap,
+    ChevronRight, Sparkles, ArrowRight,
+    X, Globe, Filter, Briefcase, MapPin,
+    Zap, Bell, Bookmark, MessageCircle
 } from 'lucide-react';
 import { useUser } from '../../context/UserContext';
 import axios from 'axios';
@@ -18,16 +16,11 @@ const StudentDashboard = () => {
     const queryClient = useQueryClient();
     const [searchTerm, setSearchTerm] = useState('');
     const [filters, setFilters] = useState({
-        name: '',
-        company: '',
-        department: '',
-        batch: '',
-        mentorship_available: '' // Show all by default
+        name: '', company: '', department: '', batch: '', mentorship_available: ''
     });
-    const [showFilters, setShowFilters] = useState(false);
-    const [activeTab, setActiveTab] = useState('browse');
+    const [activeTab, setActiveTab] = useState('explore');
 
-    // Debounced search logic - Fixes search delay and sync
+    // Debounced Search Sync
     useEffect(() => {
         const delay = setTimeout(() => {
             setFilters(prev => ({ ...prev, name: searchTerm }));
@@ -35,8 +28,8 @@ const StudentDashboard = () => {
         return () => clearTimeout(delay);
     }, [searchTerm]);
 
-    // Fetch Alumni with real-time sync
-    const { data: alumni = [], isLoading } = useQuery({
+    // High-Frequency Realtime Sync (2s Polling)
+    const { data: alumni = [], isLoading, isFetching } = useQuery({
         queryKey: ['alumni', filters],
         queryFn: async () => {
             const queryParams = new URLSearchParams(filters).toString();
@@ -46,7 +39,8 @@ const StudentDashboard = () => {
             return data;
         },
         enabled: !!user.token,
-        refetchInterval: 10000,
+        refetchInterval: 2000, // Ultra-fast sync
+        staleTime: 0
     });
 
     const [selectedAlumni, setSelectedAlumni] = useState(null);
@@ -63,301 +57,248 @@ const StudentDashboard = () => {
             queryClient.invalidateQueries(['alumni']);
             setSelectedAlumni(null);
             setRequestData({ purpose: 'career_guidance', message: '' });
-            alert("Mentorship request sent successfully!");
         }
     });
 
     const handleRequestSubmit = (e) => {
         e.preventDefault();
-        connectMutation.mutate({
-            alumniId: selectedAlumni.id,
-            ...requestData
-        });
+        connectMutation.mutate({ alumniId: selectedAlumni.id, ...requestData });
     };
 
     return (
-        <div className="flex flex-col xl:flex-row gap-10 items-start">
-            {/* Sidebar Navigation */}
-            <aside className="w-full xl:w-80 space-y-6 sticky top-32">
-                <div className="bg-white/70 backdrop-blur-2xl rounded-[3rem] p-8 shadow-[0_20px_50px_rgba(0,0,0,0.05)] border border-white/40">
-                    <div className="flex items-center gap-4 mb-10 px-2">
-                        <div className="w-12 h-12 bg-primary-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-primary-200">
-                            <Compass className="w-6 h-6" />
-                        </div>
-                        <div>
-                            <h2 className="text-xl font-black text-slate-900 tracking-tighter uppercase">Student Hub</h2>
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mt-1">Version 2.0.4</p>
-                        </div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 py-12">
+            {/* Realtime Synchronizer Status */}
+            <div className="fixed bottom-8 right-8 z-[100]">
+                <div className="flex items-center gap-3 bg-white/90 backdrop-blur-xl px-5 py-3 rounded-2xl shadow-2xl border border-slate-100 transition-all">
+                    <div className={`w-2 h-2 rounded-full ${isFetching ? 'bg-blue-500 animate-pulse' : 'bg-emerald-500'} relative`}>
+                        <div className={`absolute inset-0 rounded-full ${isFetching ? 'bg-blue-500' : 'bg-emerald-500'} animate-ping`}></div>
                     </div>
+                    <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500">Live Sync Active</span>
+                </div>
+            </div>
 
-                    <nav className="space-y-2">
+            <header className="mb-16">
+                <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-8">
+                    <motion.div
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                    >
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-black uppercase tracking-tighter">Directory Alpha</div>
+                            <span className="text-slate-300">/</span>
+                            <span className="text-slate-400 text-[10px] font-bold uppercase">v2.0 Performance</span>
+                        </div>
+                        <h1 className="text-5xl font-extrabold text-slate-900 tracking-tight mb-3">Professional <span className="text-blue-600">Network</span></h1>
+                        <p className="text-slate-500 text-lg max-w-lg leading-relaxed">Instantly connect with the next generation of industry leaders and alumni mentors.</p>
+                    </motion.div>
+
+                    <div className="flex bg-slate-100/80 backdrop-blur-md p-1.5 rounded-[20px] border border-slate-200/50 self-start">
                         {[
-                            { id: 'browse', label: 'Explore Network', icon: Users },
-                            { id: 'my_requests', label: 'Active Pursuits', icon: Zap },
-                            { id: 'bulletin', label: 'Bulletin Board', icon: Megaphone }
-                        ].map((item) => (
+                            { id: 'explore', label: 'Network', icon: Users },
+                            { id: 'bulletin', label: 'Bulletin', icon: Bell }
+                        ].map(tab => (
                             <button
-                                key={item.id}
-                                onClick={() => setActiveTab(item.id)}
-                                className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all duration-300 ${activeTab === item.id ? 'bg-slate-900 text-white shadow-2xl shadow-slate-300 translate-x-3' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'}`}
+                                key={tab.id}
+                                onClick={() => setActiveTab(tab.id)}
+                                className={`flex items-center gap-2 px-6 py-3 rounded-2xl text-sm font-bold transition-all duration-300 ${activeTab === tab.id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                             >
-                                <item.icon className={`w-4 h-4 ${activeTab === item.id ? 'text-primary-400' : ''}`} />
-                                {item.label}
+                                <tab.icon className={`w-4 h-4 ${activeTab === tab.id ? 'text-blue-600' : ''}`} />
+                                {tab.label}
                             </button>
                         ))}
-                    </nav>
-
-                    <div className="mt-12 pt-8 border-t border-slate-100">
-                        <div className="bg-gradient-to-br from-indigo-600 to-primary-600 rounded-[2rem] p-6 text-white overflow-hidden relative group">
-                            <div className="relative z-10">
-                                <Sparkles className="w-10 h-10 mb-4 text-white/50" />
-                                <h4 className="text-sm font-black uppercase tracking-widest mb-2">Build Network</h4>
-                                <p className="text-[11px] font-medium leading-relaxed text-white/80 transition-opacity">Connect with high-impact alumni to accelerate your career path.</p>
-                            </div>
-                            <div className="absolute -right-8 -bottom-8 w-24 h-24 bg-white/20 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700"></div>
-                        </div>
                     </div>
                 </div>
-            </aside>
+            </header>
 
-            {/* Main Content Area */}
-            <main className="flex-1 w-full space-y-10">
-                {activeTab === 'browse' && (
-                    <>
-                        {/* Integrated Premium Search & Filter Bar */}
-                        <div className="bg-white/80 backdrop-blur-2xl p-4 rounded-[3rem] shadow-2xl border border-white/60 flex flex-col md:flex-row items-center gap-4 relative z-50">
-                            <div className="relative flex-1 group w-full">
-                                <div className="absolute left-7 top-1/2 -translate-y-1/2 flex items-center gap-3">
-                                    <Search className="w-5 h-5 text-slate-400 group-focus-within:text-primary-600 transition-colors" />
-                                    <div className="w-[1px] h-6 bg-slate-200"></div>
-                                </div>
-                                <input
-                                    type="text"
-                                    placeholder="Search by name, role or expertise..."
-                                    className="w-full pl-20 pr-8 py-6 bg-slate-50/50 border-none rounded-[2rem] focus:ring-4 focus:ring-primary-500/10 outline-none font-bold text-slate-700 placeholder:text-slate-400 transition-all text-sm"
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                />
+            {activeTab === 'explore' && (
+                <div className="space-y-12">
+                    {/* Search Deck */}
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="grid grid-cols-1 lg:grid-cols-12 gap-6"
+                    >
+                        <div className="lg:col-span-8 relative group">
+                            <div className="absolute left-6 top-1/2 -translate-y-1/2 group-focus-within:text-blue-600 transition-colors">
+                                <Search className="w-5 h-5 text-slate-400" />
                             </div>
-                            <button
-                                onClick={() => setShowFilters(!showFilters)}
-                                className={`flex items-center gap-3 px-10 py-6 rounded-[2rem] font-black text-[10px] uppercase tracking-[0.2em] transition-all ${showFilters ? 'bg-primary-600 text-white shadow-xl shadow-primary-200' : 'bg-slate-900 text-white shadow-xl'}`}
+                            <input
+                                type="text"
+                                placeholder="Search by name, expertise, or company..."
+                                className="w-full pl-16 pr-6 h-16 bg-white border border-slate-200 rounded-[28px] text-lg font-medium placeholder:text-slate-400 focus:ring-8 focus:ring-blue-500/5 focus:border-blue-500 outline-none transition-all shadow-sm"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                            />
+                        </div>
+                        <div className="lg:col-span-4 flex gap-4">
+                            <select
+                                className="flex-1 px-6 h-16 bg-white border border-slate-200 rounded-[28px] text-sm font-bold text-slate-700 outline-none focus:border-blue-500 transition-all appearance-none cursor-pointer"
+                                value={filters.department}
+                                onChange={(e) => setFilters(prev => ({ ...prev, department: e.target.value }))}
                             >
-                                <SlidersHorizontal className="w-4 h-4" />
-                                {showFilters ? 'Hide Logic' : 'Advanced Filters'}
+                                <option value="">Global Department</option>
+                                <option value="CSE">Technology (CSE)</option>
+                                <option value="ECE">Electronics (ECE)</option>
+                                <option value="IT">Information (IT)</option>
+                                <option value="MECH">Mechanical</option>
+                            </select>
+                            <button className="w-16 h-16 flex items-center justify-center bg-slate-900 text-white rounded-[28px] hover:bg-slate-800 transition-all active:scale-95 shadow-xl shadow-slate-200">
+                                <Zap className="w-5 h-5" />
                             </button>
                         </div>
+                    </motion.div>
 
-                        {/* Expandable Filter UI */}
-                        <AnimatePresence>
-                            {showFilters && (
-                                <motion.div
-                                    initial={{ height: 0, opacity: 0, scaleY: 0.9 }}
-                                    animate={{ height: 'auto', opacity: 1, scaleY: 1 }}
-                                    exit={{ height: 0, opacity: 0, scaleY: 0.9 }}
-                                    className="overflow-hidden origin-top"
-                                >
-                                    <div className="bg-white rounded-[3rem] p-10 shadow-2xl border border-slate-100 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-4">
-                                        <div className="space-y-3">
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Target Company</label>
-                                            <input
-                                                type="text"
-                                                placeholder="e.g. Microsoft"
-                                                className="w-full px-8 py-4 bg-slate-50 rounded-2xl border-none focus:ring-4 focus:ring-primary-100 outline-none font-bold text-slate-600 text-xs"
-                                                value={filters.company}
-                                                onChange={(e) => setFilters({ ...filters, company: e.target.value })}
-                                            />
-                                        </div>
-                                        <div className="space-y-3">
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Field / Dept</label>
-                                            <select
-                                                className="w-full px-8 py-4 bg-slate-50 rounded-2xl border-none focus:ring-4 focus:ring-primary-100 outline-none font-bold text-slate-600 appearance-none cursor-pointer text-xs"
-                                                value={filters.department}
-                                                onChange={(e) => setFilters({ ...filters, department: e.target.value })}
-                                            >
-                                                <option value="">All Streams</option>
-                                                <option value="CSE">CSE / IT</option>
-                                                <option value="ECE">ECE / EEE</option>
-                                                <option value="MECH">Mechanical</option>
-                                                <option value="CIVIL">Civil</option>
-                                            </select>
-                                        </div>
-                                        <div className="space-y-3">
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Availability Loop</label>
-                                            <select
-                                                className="w-full px-8 py-4 bg-slate-50 rounded-2xl border-none focus:ring-4 focus:ring-primary-100 outline-none font-bold text-slate-600 appearance-none cursor-pointer text-xs"
-                                                value={filters.mentorship_available}
-                                                onChange={(e) => setFilters({ ...filters, mentorship_available: e.target.value })}
-                                            >
-                                                <option value="">Global Search</option>
-                                                <option value="true">Open for Mentorship</option>
-                                            </select>
-                                        </div>
-                                        <div className="flex items-end">
-                                            <button
-                                                onClick={() => {
-                                                    setSearchTerm('');
-                                                    setFilters({ name: '', company: '', department: '', batch: '', mentorship_available: '' });
-                                                }}
-                                                className="w-full py-4 bg-slate-900 text-white hover:bg-primary-600 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg"
-                                            >
-                                                Reset Engine
-                                            </button>
-                                        </div>
-                                    </div>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-
-                        {/* Elite Results Grid */}
-                        <div className="grid md:grid-cols-2 2xl:grid-cols-3 gap-10">
+                    {/* Results Portfolio */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
+                        <AnimatePresence mode="popLayout">
                             {isLoading ? (
-                                [1, 2, 3, 4, 5, 6].map(i => (
-                                    <div key={i} className="h-96 bg-white/40 animate-pulse rounded-[4rem] border border-white"></div>
+                                Array.from({ length: 9 }).map((_, i) => (
+                                    <div key={i} className="h-[420px] bg-slate-100 animate-pulse rounded-[40px]"></div>
                                 ))
                             ) : alumni.length > 0 ? (
-                                <AnimatePresence mode="popLayout">
-                                    {alumni.map((person, i) => (
-                                        <motion.div
-                                            key={person.id}
-                                            layout
-                                            initial={{ opacity: 0, scale: 0.9, y: 30 }}
-                                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                                            exit={{ opacity: 0, scale: 0.9 }}
-                                            transition={{ delay: i * 0.03 }}
-                                            whileHover={{ y: -15 }}
-                                            className="bg-white rounded-[4rem] p-10 shadow-xl border border-slate-100 hover:border-primary-200 transition-all group overflow-hidden relative"
-                                        >
-                                            <div className="absolute top-0 right-0 w-40 h-40 bg-primary-600/5 rounded-full -mr-20 -mt-20 blur-3xl group-hover:bg-primary-600/10 transition-colors duration-500"></div>
+                                alumni.map((person, i) => (
+                                    <motion.div
+                                        key={person.id}
+                                        layout
+                                        initial={{ opacity: 0, scale: 0.9 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        exit={{ opacity: 0, scale: 0.9 }}
+                                        transition={{ delay: i * 0.05 }}
+                                        className="group premium-card p-10 flex flex-col h-[480px] relative overflow-hidden"
+                                    >
+                                        <div className="absolute top-0 right-0 p-8">
+                                            <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                                        </div>
 
-                                            <div className="flex items-center gap-6 mb-10 relative z-10">
-                                                <div className="w-24 h-24 bg-gradient-to-br from-slate-900 to-slate-800 rounded-[2.5rem] flex items-center justify-center text-white font-black text-4xl group-hover:rotate-6 transition-transform shadow-2xl">
-                                                    {person.name.charAt(0)}
-                                                </div>
-                                                <div>
-                                                    <h4 className="text-2xl font-black text-slate-900 tracking-tighter uppercase mb-1 leading-none">{person.name}</h4>
-                                                    <p className="text-[9px] font-black text-primary-600 uppercase tracking-[0.2em] mb-3">{person.job_role}</p>
-                                                    {person.mentorship_available && (
-                                                        <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-50 rounded-full border border-emerald-100">
-                                                            <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
-                                                            <span className="text-[8px] font-black text-emerald-600 uppercase tracking-widest">Active Mentor</span>
-                                                        </div>
-                                                    )}
+                                        <div className="flex items-center gap-6 mb-10">
+                                            <div className="w-20 h-20 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-[30px] flex items-center justify-center text-3xl font-black text-white shadow-2xl shadow-blue-200 group-hover:scale-110 transition-transform duration-500">
+                                                {person.name.charAt(0)}
+                                            </div>
+                                            <div>
+                                                <h3 className="text-2xl font-black text-slate-900 leading-tight mb-1">{person.name}</h3>
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
+                                                    <span className="text-xs font-black text-blue-600 uppercase tracking-widest">{person.job_role || 'Executive'}</span>
                                                 </div>
                                             </div>
+                                        </div>
 
-                                            <div className="space-y-4 mb-10 relative z-10">
-                                                <div className="flex items-center gap-4 p-4 bg-slate-50/50 rounded-3xl border border-slate-100 group-hover:bg-white transition-colors">
-                                                    <Building className="w-5 h-5 text-indigo-500" />
-                                                    <div className="flex flex-col">
-                                                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-[0.2em]">Company</span>
-                                                        <span className="text-sm font-black text-slate-700">{person.company || 'Tech Leader'}</span>
-                                                    </div>
+                                        <div className="space-y-6 flex-1">
+                                            <div className="p-5 bg-slate-50 rounded-3xl border border-slate-100 group-hover:bg-blue-50/50 group-hover:border-blue-100 transition-colors">
+                                                <div className="flex items-center gap-3 mb-2">
+                                                    <Building className="w-4 h-4 text-slate-400" />
+                                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Base Operations</span>
                                                 </div>
-                                                <div className="flex items-center gap-4 p-4 bg-slate-50/50 rounded-3xl border border-slate-100 group-hover:bg-white transition-colors">
-                                                    <GraduationCap className="w-5 h-5 text-primary-500" />
-                                                    <div className="flex flex-col">
-                                                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-[0.2em]">Academic Loop</span>
-                                                        <span className="text-sm font-black text-slate-700">{person.department} • Class of {person.batch}</span>
+                                                <p className="text-sm font-bold text-slate-800">{person.company || 'Global Enterprise'}</p>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="p-5 bg-slate-50 rounded-3xl border border-slate-100">
+                                                    <div className="flex items-center gap-2 mb-2">
+                                                        <GraduationCap className="w-3.5 h-3.5 text-slate-400" />
+                                                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Sector</span>
                                                     </div>
+                                                    <p className="text-[11px] font-black text-slate-800">{person.department}</p>
+                                                </div>
+                                                <div className="p-5 bg-slate-50 rounded-3xl border border-slate-100">
+                                                    <div className="flex items-center gap-2 mb-2">
+                                                        <Zap className="w-3.5 h-3.5 text-slate-400" />
+                                                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Batch</span>
+                                                    </div>
+                                                    <p className="text-[11px] font-black text-slate-800">{person.batch}</p>
                                                 </div>
                                             </div>
+                                        </div>
 
+                                        <div className="mt-10">
                                             <button
                                                 onClick={() => setSelectedAlumni(person)}
-                                                className="w-full py-6 bg-slate-900 text-white rounded-[2.5rem] font-black text-[10px] uppercase tracking-[0.3em] hover:bg-primary-600 shadow-2xl transition-all active:scale-95 flex items-center justify-center gap-3 group/btn"
+                                                className="w-full bg-slate-900 group-hover:bg-blue-600 text-white py-5 rounded-[24px] font-black text-xs uppercase tracking-[0.2em] flex items-center justify-center gap-3 transition-all duration-300 hover:shadow-2xl hover:shadow-blue-200 active:scale-[0.98]"
                                             >
-                                                Initialize Pursuit <ArrowRight className="w-4 h-4 group-hover/btn:translate-x-2 transition-transform" />
+                                                Request Protocol <ArrowRight className="w-4 h-4" />
                                             </button>
-                                        </motion.div>
-                                    ))}
-                                </AnimatePresence>
+                                        </div>
+                                    </motion.div>
+                                ))
                             ) : (
                                 <motion.div
                                     initial={{ opacity: 0 }}
                                     animate={{ opacity: 1 }}
-                                    className="col-span-full py-40 text-center bg-white/40 rounded-[5rem] border-4 border-dashed border-white"
+                                    className="col-span-full py-32 text-center"
                                 >
-                                    <div className="w-24 h-24 bg-white shadow-2xl rounded-[2.5rem] flex items-center justify-center mx-auto mb-10">
-                                        <Search className="w-10 h-10 text-slate-200" />
+                                    <div className="w-24 h-24 bg-slate-100 rounded-[40px] flex items-center justify-center mx-auto mb-8">
+                                        <Users className="w-10 h-10 text-slate-300" />
                                     </div>
-                                    <h3 className="text-4xl font-black text-slate-900 uppercase tracking-tighter mb-4">No Connections Formed</h3>
-                                    <p className="text-slate-500 font-bold text-lg max-w-sm mx-auto leading-relaxed">The search engine couldn't find matches. Try broadening your criteria.</p>
-                                    <button
-                                        onClick={() => {
-                                            setSearchTerm('');
-                                            setFilters({ name: '', company: '', department: '', batch: '', mentorship_available: '' });
-                                        }}
-                                        className="mt-12 px-12 py-5 bg-slate-900 text-white rounded-full font-black uppercase tracking-widest text-xs hover:bg-primary-600 transition-all shadow-2xl"
-                                    >
-                                        Reset Search Loop
-                                    </button>
+                                    <h3 className="text-3xl font-black text-slate-900 mb-3 tracking-tighter">Signal Lost</h3>
+                                    <p className="text-slate-500 font-medium">No connection points matching your current filters.</p>
                                 </motion.div>
                             )}
-                        </div>
-                    </>
-                )}
-
-                {activeTab === 'bulletin' && <BulletinBoard />}
-                {activeTab === 'my_requests' && (
-                    <div className="py-40 text-center bg-white rounded-[5rem] border shadow-xl">
-                        <Zap className="w-24 h-24 text-slate-200 animate-pulse mx-auto mb-10" />
-                        <h2 className="text-5xl font-black text-slate-900 tracking-tighter uppercase mb-6">Synchronization In Progress</h2>
-                        <p className="text-slate-500 font-bold text-lg max-w-lg mx-auto leading-relaxed">Your active mentorship pursuits are being synced with the secure cloud repository.</p>
-                        <button onClick={() => setActiveTab('browse')} className="mt-12 px-12 py-5 bg-slate-900 text-white rounded-full font-black uppercase tracking-widest text-xs hover:bg-primary-600 transition-all shadow-2xl">Return to Exploration</button>
+                        </AnimatePresence>
                     </div>
-                )}
-            </main>
+                </div>
+            )}
 
-            {/* Modal: Pursuit Initialization */}
+            {activeTab === 'bulletin' && <BulletinBoard />}
+
+            {/* NextLevel Request Modal */}
             <AnimatePresence>
                 {selectedAlumni && (
-                    <div className="fixed inset-0 z-[1000] flex items-center justify-center p-6">
-                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setSelectedAlumni(null)} className="absolute inset-0 bg-slate-900/80 backdrop-blur-xl" />
+                    <div className="fixed inset-0 z-[200] flex items-center justify-center p-6">
                         <motion.div
-                            initial={{ opacity: 0, scale: 0.8, rotateX: 20 }}
-                            animate={{ opacity: 1, scale: 1, rotateX: 0 }}
-                            exit={{ opacity: 0, scale: 0.8, rotateX: 20 }}
-                            className="bg-white w-full max-w-xl rounded-[4rem] shadow-2xl relative z-10 overflow-hidden"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setSelectedAlumni(null)}
+                            className="absolute inset-0 bg-slate-950/60 backdrop-blur-2xl"
+                        />
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.9, y: 40 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.9, y: 40 }}
+                            className="bg-white w-full max-w-xl rounded-[48px] shadow-2xl relative z-10 overflow-hidden border border-white/20"
                         >
                             <div className="p-12">
-                                <header className="flex justify-between items-start mb-12">
+                                <div className="flex items-center justify-between mb-12">
                                     <div>
-                                        <h3 className="text-4xl font-black text-slate-900 uppercase tracking-tighter mb-2 leading-none">Initialize Pursuit</h3>
-                                        <p className="text-slate-500 font-bold text-sm">Target: <span className="text-primary-600 uppercase tracking-widest">{selectedAlumni.name}</span></p>
+                                        <h3 className="text-4xl font-black text-slate-900 tracking-tighter mb-2">Initialize Connection</h3>
+                                        <p className="text-slate-500 font-bold uppercase text-[10px] tracking-widest">To: {selectedAlumni.name}</p>
                                     </div>
-                                    <button onClick={() => setSelectedAlumni(null)} className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-900 transition-all">
+                                    <button onClick={() => setSelectedAlumni(null)} className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center hover:bg-red-50 hover:text-red-500 transition-all">
                                         <X className="w-6 h-6" />
                                     </button>
-                                </header>
-
-                                <form onSubmit={handleRequestSubmit} className="space-y-10">
-                                    <div className="space-y-4">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-6">Engagement Protocol</label>
+                                </div>
+                                <form onSubmit={handleRequestSubmit} className="space-y-8">
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 block ml-2">Mission Purpose</label>
                                         <div className="grid grid-cols-2 gap-3">
-                                            {['career_guidance', 'resume_review', 'interview_prep', 'referral'].map(mode => (
+                                            {['career_guidance', 'resume_review', 'interview_prep', 'referral'].map(p => (
                                                 <button
-                                                    key={mode}
+                                                    key={p}
                                                     type="button"
-                                                    onClick={() => setRequestData({ ...requestData, purpose: mode })}
-                                                    className={`py-4 px-6 rounded-2xl text-[10px] uppercase font-black tracking-widest transition-all border-2 ${requestData.purpose === mode ? 'bg-slate-900 text-white border-slate-900 shadow-xl' : 'bg-white text-slate-500 border-slate-100 hover:border-primary-100'}`}
+                                                    onClick={() => setRequestData({ ...requestData, purpose: p })}
+                                                    className={`py-4 px-6 rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all ${requestData.purpose === p ? 'bg-blue-600 border-blue-600 text-white shadow-xl shadow-blue-200' : 'bg-white border-slate-100 text-slate-500 hover:border-blue-200'}`}
                                                 >
-                                                    {mode.replace('_', ' ')}
+                                                    {p.replace('_', ' ')}
                                                 </button>
                                             ))}
                                         </div>
                                     </div>
-                                    <div className="space-y-4">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-6">Personalized Message</label>
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 block ml-2">Personal Briefing</label>
                                         <textarea
-                                            className="w-full p-8 bg-slate-50/80 rounded-[2.5rem] border-none focus:ring-4 focus:ring-primary-500/10 outline-none font-bold text-sm min-h-[160px] placeholder:text-slate-300"
-                                            placeholder="Introduce yourself with impact..."
+                                            className="w-full p-8 bg-slate-50 border border-slate-100 rounded-[32px] text-sm font-medium placeholder:text-slate-300 min-h-[180px] focus:ring-8 focus:ring-blue-500/5 focus:border-blue-600 outline-none transition-all"
+                                            placeholder="Introduce yourself and explain the value of this connection..."
                                             value={requestData.message}
                                             onChange={(e) => setRequestData({ ...requestData, message: e.target.value })}
                                             required
                                         />
                                     </div>
-                                    <button type="submit" className="w-full py-7 bg-slate-900 text-white rounded-[2.5rem] font-black text-xs uppercase tracking-[0.4em] hover:bg-primary-600 shadow-2xl shadow-slate-200 transition-all active:scale-95">Send Pulsar Request</button>
+                                    <button
+                                        type="submit"
+                                        className="w-full bg-blue-600 py-6 rounded-[32px] text-white font-black uppercase tracking-[0.3em] text-xs flex items-center justify-center gap-4 hover:bg-blue-700 transition-all shadow-2xl shadow-blue-200 active:scale-95"
+                                        disabled={connectMutation.isPending}
+                                    >
+                                        {connectMutation.isPending ? 'Transmitting...' : 'Send Transmission'} <Zap className="w-5 h-5" />
+                                    </button>
                                 </form>
                             </div>
                         </motion.div>
