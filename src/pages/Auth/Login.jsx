@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Mail, Lock, ArrowRight, Github, Chrome, CheckCircle2, ShieldCheck, GraduationCap } from 'lucide-react';
+import { Mail, Lock, ArrowRight, Github, Chrome, CheckCircle2, ShieldCheck, GraduationCap, Eye, EyeOff } from 'lucide-react';
 import { login as loginService } from '../../services/authService';
 import { useUser } from '../../context/UserContext';
 
@@ -11,6 +11,7 @@ const Login = () => {
     const [formData, setFormData] = useState({ email: '', password: '' });
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -153,12 +154,19 @@ const Login = () => {
                                     <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-primary-500 transition-colors" />
                                     <input
                                         name="password"
-                                        type="password"
+                                        type={showPassword ? "text" : "password"}
                                         placeholder="••••••••"
                                         onChange={handleChange}
                                         required
-                                        className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 focus:bg-white outline-none transition-all font-medium"
+                                        className="w-full pl-12 pr-12 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 focus:bg-white outline-none transition-all font-medium"
                                     />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-1"
+                                    >
+                                        {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -182,23 +190,7 @@ const Login = () => {
                         </button>
                     </form>
 
-                    <div className="mt-10 relative">
-                        <div className="absolute inset-0 flex items-center">
-                            <div className="w-full border-t border-slate-100"></div>
-                        </div>
-                        <div className="relative flex justify-center text-sm">
-                            <span className="px-4 bg-white text-slate-400 font-bold uppercase tracking-wider text-[10px]">Or continue with</span>
-                        </div>
-                    </div>
 
-                    <div className="grid grid-cols-2 gap-4 mt-8">
-                        <button className="flex items-center justify-center gap-3 px-4 py-3 border border-slate-200 rounded-xl hover:bg-slate-50 transition-all font-bold text-slate-700">
-                            <Chrome className="w-5 h-5" /> Google
-                        </button>
-                        <button className="flex items-center justify-center gap-3 px-4 py-3 border border-slate-200 rounded-xl hover:bg-slate-50 transition-all font-bold text-slate-700">
-                            <Github className="w-5 h-5" /> GitHub
-                        </button>
-                    </div>
 
                     <p className="mt-12 text-center text-slate-500 font-medium">
                         New to the platform? <Link to="/register" className="text-primary-600 hover:text-primary-700 font-bold underline underline-offset-4 decoration-2">Create an account</Link>

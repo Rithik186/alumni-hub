@@ -5,7 +5,7 @@ import {
     User, Mail, Phone, Lock, School,
     Briefcase, GraduationCap, ArrowRight,
     CheckCircle2, Smartphone, ShieldCheck,
-    Building, BookOpen, Fingerprint
+    Building, BookOpen, Fingerprint, Eye, EyeOff
 } from 'lucide-react';
 import { register, verifyOtp as verifyOtpService } from '../../services/authService';
 import { useUser } from '../../context/UserContext';
@@ -23,13 +23,38 @@ const Register = () => {
     const [otp, setOtp] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+    const [strength, setStrength] = useState({ score: 0, label: 'Weak', color: 'bg-slate-200' });
+
+    const checkStrength = (pass) => {
+        let score = 0;
+        if (pass.length > 8) score++;
+        if (/[A-Z]/.test(pass)) score++;
+        if (/[0-9]/.test(pass)) score++;
+        if (/[^A-Za-z0-9]/.test(pass)) score++;
+
+        const levels = [
+            { label: 'Very Weak', color: 'bg-red-500' },
+            { label: 'Weak', color: 'bg-orange-500' },
+            { label: 'Medium', color: 'bg-yellow-500' },
+            { label: 'Strong', color: 'bg-emerald-500' },
+            { label: 'Exceptional', color: 'bg-primary-500' }
+        ];
+        setStrength({ score, ...levels[score] });
+    };
 
     const handleChange = (e) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
+        const { name, value } = e.target;
+        setFormData({ ...formData, [name]: value });
+        if (name === 'password') checkStrength(value);
     };
 
     const handleRegister = async (e) => {
         e.preventDefault();
+        if (formData.password !== formData.confirmPassword) {
+            return setError('Passwords do not match');
+        }
         setLoading(true);
         setError('');
         try {
@@ -190,9 +215,67 @@ const Register = () => {
                                     <input name="phone_number" placeholder="10-digit Mobile" onChange={handleChange} required className={inputClasses} />
                                 </div>
 
-                                <div className="relative group">
-                                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-primary-500 transition-colors" />
-                                    <input name="password" type="password" placeholder="Create Secure Password" onChange={handleChange} required className={inputClasses} />
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="space-y-4">
+                                        <div className="relative group">
+                                            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-primary-500 transition-colors" />
+                                            <input
+                                                name="password"
+                                                type={showPassword ? "text" : "password"}
+                                                placeholder="Create Password"
+                                                onChange={handleChange}
+                                                required
+                                                className={inputClasses + " pr-12"}
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowPassword(!showPassword)}
+                                                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-1"
+                                            >
+                                                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                            </button>
+                                        </div>
+
+                                        <div className="relative group">
+                                            <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-primary-500 transition-colors" />
+                                            <input
+                                                name="confirmPassword"
+                                                type={showConfirmPassword ? "text" : "password"}
+                                                placeholder="Confirm Password"
+                                                onChange={handleChange}
+                                                required
+                                                className={inputClasses + " pr-12"}
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-1"
+                                            >
+                                                {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Password Strength Card */}
+                                    <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 flex flex-col justify-center">
+                                        <div className="flex justify-between items-center mb-3">
+                                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Strength</span>
+                                            <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${strength.color.replace('bg-', 'text-').replace('500', '600')} ${strength.color.replace('bg-', 'bg-')}/10`}>
+                                                {strength.label}
+                                            </span>
+                                        </div>
+                                        <div className="h-1.5 w-full bg-slate-200 rounded-full overflow-hidden flex gap-0.5">
+                                            {[1, 2, 3, 4].map((step) => (
+                                                <div
+                                                    key={step}
+                                                    className={`h-full flex-1 transition-all duration-500 ${step <= strength.score ? strength.color : 'bg-slate-200'}`}
+                                                ></div>
+                                            ))}
+                                        </div>
+                                        <p className="text-[9px] text-slate-400 mt-3 font-medium leading-tight">
+                                            Use 8+ characters with a mix of letters, numbers & symbols for elite security.
+                                        </p>
+                                    </div>
                                 </div>
 
                                 <div className="space-y-4 pt-4 border-t border-slate-100">

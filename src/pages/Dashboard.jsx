@@ -11,9 +11,9 @@ const Dashboard = () => {
     if (loading) return null;
 
     return (
-        <div className="min-h-screen bg-slate-50">
+        <div className="min-h-screen gradient-mesh">
             <Navbar />
-            <div className="pt-24 px-6 pb-12">
+            <div className="pt-28 px-6 pb-20">
                 <div className="container mx-auto">
                     {user?.role === 'student' && <StudentDashboard />}
                     {user?.role === 'alumni' && <AlumniDashboard />}

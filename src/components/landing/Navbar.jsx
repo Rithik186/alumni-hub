@@ -34,10 +34,12 @@ export const Navbar = () => {
             <div className="container mx-auto px-6 flex justify-between items-center">
                 <Link
                     to="/"
-                    className="text-2xl font-bold flex items-center gap-2 text-primary-600"
+                    className="text-2xl font-black flex items-center gap-2 text-slate-900 group"
                 >
-                    <GraduationCap className="w-8 h-8" />
-                    <span>AlumniHub</span>
+                    <div className="w-10 h-10 bg-primary-600 rounded-xl flex items-center justify-center group-hover:rotate-12 transition-transform shadow-lg shadow-primary-200">
+                        <GraduationCap className="w-6 h-6 text-white" />
+                    </div>
+                    <span className="tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-slate-900 to-slate-600">AlumniHub</span>
                 </Link>
 
                 {/* Desktop Menu */}
@@ -59,12 +61,12 @@ export const Navbar = () => {
                         <div className="relative">
                             <button
                                 onClick={() => setShowProfileCard(!showProfileCard)}
-                                className="flex items-center gap-2 text-slate-700 hover:text-primary-600 font-semibold px-4 py-2 rounded-xl bg-slate-100/50 hover:bg-slate-100 transition-all"
+                                className="flex items-center gap-3 text-slate-700 hover:text-primary-600 font-black px-4 py-2 rounded-2xl bg-white shadow-sm border border-slate-100 hover:shadow-md hover:border-primary-100 transition-all focus:ring-4 focus:ring-primary-500/10"
                             >
-                                <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white text-xs">
+                                <div className="w-8 h-8 bg-slate-900 rounded-xl flex items-center justify-center text-white text-[10px] font-black uppercase tracking-widest">
                                     {user.name.charAt(0)}
                                 </div>
-                                <span>{user.name.split(' ')[0]}</span>
+                                <span className="text-[10px] uppercase tracking-widest hidden sm:block">{user.name.split(' ')[0]}</span>
                             </button>
 
                             {/* Profile Dropdown/Card */}
