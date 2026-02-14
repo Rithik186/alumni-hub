@@ -1,12 +1,13 @@
-
 import express from 'express';
-import { approveAlumni, createAnnouncement, getAnalytics } from '../controllers/adminController.js';
+import { getPendingAlumni, updateApprovalStatus, getPlatformStats, getAllUsers, toggleUserStatus } from '../controllers/adminController.js';
 import { protect, adminOnly } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-router.patch('/approve-alumni/:id', protect, adminOnly, approveAlumni);
-router.post('/announcements', protect, adminOnly, createAnnouncement);
-router.get('/analytics', protect, adminOnly, getAnalytics);
+router.get('/pending-alumni', protect, adminOnly, getPendingAlumni);
+router.post('/update-approval', protect, adminOnly, updateApprovalStatus);
+router.get('/stats', protect, adminOnly, getPlatformStats);
+router.get('/users', protect, adminOnly, getAllUsers);
+router.patch('/users/:userId/toggle-status', protect, adminOnly, toggleUserStatus);
 
 export default router;
