@@ -1,27 +1,24 @@
 import express from 'express';
 import {
-    sendConnectionRequest,
-    updateConnectionStatus,
-    getPendingRequests,
-    getMyConnections,
     followUser,
     unfollowUser,
+    updateFollowStatus,
     getConnectionStats,
-    getSuggestions
+    getFollowRequests,
+    getSuggestions,
+    getMyFollowingsStatuses
 } from '../controllers/connectionController.js';
 import { protect } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-router.post('/request', protect, sendConnectionRequest);
-router.put('/status', protect, updateConnectionStatus);
-router.get('/pending', protect, getPendingRequests);
-router.get('/my', protect, getMyConnections);
-
-// New LinkedIn-style routes
+// Social Logic
 router.post('/follow/:followingId', protect, followUser);
 router.delete('/follow/:followingId', protect, unfollowUser);
+router.put('/follow/status', protect, updateFollowStatus);
+router.get('/requests', protect, getFollowRequests);
 router.get('/stats', protect, getConnectionStats);
 router.get('/suggestions', protect, getSuggestions);
+router.get('/my-statuses', protect, getMyFollowingsStatuses);
 
 export default router;

@@ -10,6 +10,15 @@
   --bg-main: #f8fafc;
   --card-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
   --card-hover-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+
+  /* New Vibrant Color Palette */
+  --teal-50: #f0fdfa;
+  --teal-100: #ccfbf1;
+  --teal-200: #99f6e4;
+  --teal-300: #5eead4;
+  --teal-400: #2dd4bf;
+  --teal-500: #14b8a6;
+  --teal-600: #0d9488;
 }
 
 @layer base {
@@ -82,4 +91,12 @@
 
 .animate-float {
   animation: float 6s ease-in-out infinite;
+
+  .premium-img-container {
+    @apply relative overflow-hidden rounded-[32px] border border-white/5 shadow-2xl;
+  }
+
+  .premium-img-container img {
+    @apply w-full h-full object-cover transition-transform duration-700 hover:scale-110;
+  }
 }

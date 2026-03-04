@@ -102,6 +102,7 @@ export const verifyOtp = async (req, res) => {
             name: user.name,
             email: user.email,
             role: user.role,
+            profile_picture: user.profile_picture,
             token: generateToken(user.id, user.role)
         });
 
@@ -139,6 +140,7 @@ export const loginUser = async (req, res) => {
                 name: user.name,
                 email: user.email,
                 role: user.role,
+                profile_picture: user.profile_picture,
                 token: generateToken(user.id, user.role)
             });
         } else {
@@ -156,7 +158,7 @@ export const loginUser = async (req, res) => {
 export const getMe = async (req, res) => {
     try {
         const userResult = await db.query(
-            'SELECT id, name, email, phone_number, role, college, is_verified, created_at FROM users WHERE id = $1',
+            'SELECT id, name, email, phone_number, role, college, is_verified, created_at, profile_picture FROM users WHERE id = $1',
             [req.user.id]
         );
 
