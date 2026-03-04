@@ -8,6 +8,7 @@ import mentorshipRoutes from './routes/mentorshipRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import connectionRoutes from './routes/connectionRoutes.js';
 import eventRoutes from './routes/eventRoutes.js';
+import postRoutes from './routes/postRoutes.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -33,6 +34,7 @@ app.use('/api/mentorship', mentorshipRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/connections', connectionRoutes);
 app.use('/api/events', eventRoutes);
+app.use('/api/posts', postRoutes);
 
 // Error Handling Middleware
 app.use((err, req, res, next) => {

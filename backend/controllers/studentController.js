@@ -1,8 +1,12 @@
 import db from '../config/db.js';
 
-// Get all approved alumni with advanced filters and real-time feel
+// Enhanced Alumni Search with "LinkedIn-style" granularity
 export const searchAlumni = async (req, res) => {
-    const { name, company, college, department, batch, skills, experience_level, mentorship_available } = req.query;
+    const {
+        name, company, college, department, batch, skills,
+        job_role, experience_level, mentorship_available,
+        bio, placement_status, created_after
+    } = req.query;
 
     try {
         let query = `
@@ -11,8 +15,6 @@ export const searchAlumni = async (req, res) => {
             JOIN alumni_profiles ap ON u.id = ap.user_id
             WHERE u.role = 'alumni' 
         `;
-        // Removed strict is_approved/is_active for demo robustness unless explicitly requested
-        // but we keep them in the DB fix script
 
         const params = [];
         let paramCount = 1;
@@ -27,6 +29,11 @@ export const searchAlumni = async (req, res) => {
             params.push(`%${company}%`);
             paramCount++;
         }
+        if (college) {
+            query += ` AND u.college ILIKE $${paramCount}`;
+            params.push(`%${college}%`);
+            paramCount++;
+        }
         if (department) {
             query += ` AND ap.department ILIKE $${paramCount}`;
             params.push(`%${department}%`);
@@ -37,6 +44,11 @@ export const searchAlumni = async (req, res) => {
             params.push(batch);
             paramCount++;
         }
+        if (job_role) {
+            query += ` AND ap.job_role ILIKE $${paramCount}`;
+            params.push(`%${job_role}%`);
+            paramCount++;
+        }
         if (mentorship_available === 'true') {
             query += ` AND ap.mentorship_available = true`;
         }
@@ -45,6 +57,17 @@ export const searchAlumni = async (req, res) => {
             params.push(experience_level);
             paramCount++;
         }
+        if (bio) {
+            query += ` AND ap.bio ILIKE $${paramCount}`;
+            params.push(`%${bio}%`);
+            paramCount++;
+        }
+        if (created_after) {
+            query += ` AND u.created_at > $${paramCount}`;
+            params.push(created_after);
+            paramCount++;
+        }
+
         // Skills filter (array overlap)
         if (skills) {
             const skillsArray = skills.split(',').map(s => s.trim());

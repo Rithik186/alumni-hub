@@ -6,7 +6,8 @@ import {
     GraduationCap, Briefcase, LayoutDashboard,
     Users, MessageSquare, ShieldCheck, Power,
     FileText, User, ChevronRight, Clock,
-    Zap, Rocket, Target, Star, Building
+    Zap, Rocket, Target, Star, Building,
+    Send, Plus, Image as ImageIcon, Sparkles
 } from 'lucide-react';
 import { useUser } from '../../context/UserContext';
 import axios from 'axios';
@@ -16,6 +17,8 @@ const AlumniDashboard = () => {
     const { user } = useUser();
     const queryClient = useQueryClient();
     const [activeTab, setActiveTab] = useState('overview');
+    const [postContent, setPostContent] = useState('');
+    const [isPosting, setIsPosting] = useState(false);
 
     // Realtime Sync Engine (2s Polling)
     const { data: dashboardData, isLoading, isFetching } = useQuery({
@@ -50,6 +53,20 @@ const AlumniDashboard = () => {
         },
         onSuccess: () => {
             queryClient.invalidateQueries(['alumniDashboard']);
+        }
+    });
+
+    const createPostMutation = useMutation({
+        mutationFn: async (content) => {
+            return axios.post('/api/posts', { content }, {
+                headers: { 'Authorization': `Bearer ${user.token}` }
+            });
+        },
+        onSuccess: () => {
+            setPostContent('');
+            setIsPosting(false);
+            queryClient.invalidateQueries(['feed']);
+            alert('Achievement Broadcasted Successfully!');
         }
     });
 
@@ -103,7 +120,8 @@ const AlumniDashboard = () => {
                     <div className="flex bg-slate-100/60 backdrop-blur-md p-2 rounded-[28px] border border-slate-200/50">
                         {[
                             { id: 'overview', label: 'Dashboard', icon: LayoutDashboard },
-                            { id: 'requests', label: 'Inbox', icon: Bell, count: pendingRequests.length }
+                            { id: 'requests', label: 'Inbox', icon: Bell, count: pendingRequests.length },
+                            { id: 'broadcast', label: 'Share', icon: Send }
                         ].map(tab => (
                             <button
                                 key={tab.id}
@@ -124,6 +142,38 @@ const AlumniDashboard = () => {
             </header>
 
             <main>
+                {activeTab === 'broadcast' && (
+                    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-3xl mx-auto">
+                        <div className="premium-card p-12">
+                            <div className="flex items-center gap-4 mb-10">
+                                <div className="p-4 bg-indigo-50 text-indigo-600 rounded-2xl"><Sparkles className="w-6 h-6" /></div>
+                                <div>
+                                    <h3 className="text-2xl font-black text-slate-900 tracking-tighter">Share Achievement</h3>
+                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest uppercase">Visible to your student network</p>
+                                </div>
+                            </div>
+                            <textarea
+                                value={postContent}
+                                onChange={(e) => setPostContent(e.target.value)}
+                                className="w-full p-8 bg-slate-50 border-none rounded-[32px] text-lg font-medium min-h-[200px] outline-none focus:ring-4 focus:ring-indigo-500/5 transition-all mb-8"
+                                placeholder="Post an update, achievement, or thoughts..."
+                            />
+                            <div className="flex items-center justify-between">
+                                <button className="flex items-center gap-3 px-6 py-3 bg-slate-100 text-slate-500 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all">
+                                    <ImageIcon className="w-4 h-4" /> Add Asset
+                                </button>
+                                <button
+                                    onClick={() => createPostMutation.mutate(postContent)}
+                                    disabled={!postContent || createPostMutation.isPending}
+                                    className="px-10 py-4 bg-slate-900 text-white rounded-[24px] text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600 shadow-xl shadow-slate-100 transition-all disabled:opacity-50"
+                                >
+                                    {createPostMutation.isPending ? 'Propagating...' : 'Post Broadcast'}
+                                </button>
+                            </div>
+                        </div>
+                    </motion.div>
+                )}
+
                 {activeTab === 'overview' && (
                     <div className="space-y-12">
                         {/* High-Impact Stat Cards */}

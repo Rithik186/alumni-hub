@@ -5,7 +5,11 @@ import {
     Search, Users, Building, GraduationCap,
     ChevronRight, Sparkles, ArrowRight,
     X, Globe, Filter, Briefcase, MapPin,
-    Zap, Bell, Bookmark, MessageCircle
+    Zap, Bell, Bookmark, MessageCircle,
+    ThumbsUp, ThumbsDown, MessageSquare, Share2,
+    Plus, UserPlus, UserCheck, MoreHorizontal,
+    Heart, Send, Image as ImageIcon, Smile,
+    Calendar, Award, Hash, Link as LinkIcon
 } from 'lucide-react';
 import { useUser } from '../../context/UserContext';
 import axios from 'axios';
@@ -14,297 +18,359 @@ import BulletinBoard from './BulletinBoard';
 const StudentDashboard = () => {
     const { user } = useUser();
     const queryClient = useQueryClient();
-    const [searchTerm, setSearchTerm] = useState('');
+    const [activeTab, setActiveTab] = useState('feed'); // feed, network, connections
     const [filters, setFilters] = useState({
-        name: '', company: '', department: '', batch: '', mentorship_available: ''
+        name: '', company: '', college: '', department: '', batch: '',
+        skills: '', job_role: '', experience_level: '', mentorship_available: ''
     });
-    const [activeTab, setActiveTab] = useState('explore');
+    const [isFilterOpen, setIsFilterOpen] = useState(false);
+    const [commentText, setCommentText] = useState({});
 
-    // Debounced Search Sync
-    useEffect(() => {
-        const delay = setTimeout(() => {
-            setFilters(prev => ({ ...prev, name: searchTerm }));
-        }, 300);
-        return () => clearTimeout(delay);
-    }, [searchTerm]);
-
-    // High-Frequency Realtime Sync (2s Polling)
-    const { data: alumni = [], isLoading, isFetching } = useQuery({
-        queryKey: ['alumni', filters],
+    // Fetch Feed
+    const { data: feed = [], isLoading: feedLoading } = useQuery({
+        queryKey: ['feed'],
         queryFn: async () => {
-            const queryParams = new URLSearchParams(filters).toString();
-            const { data } = await axios.get(`/api/student/alumni?${queryParams}`, {
+            const { data } = await axios.get('/api/posts/feed', {
                 headers: { 'Authorization': `Bearer ${user.token}` }
             });
             return data;
         },
-        enabled: !!user.token,
-        refetchInterval: 2000, // Ultra-fast sync
-        staleTime: 0
+        refetchInterval: 5000
     });
 
-    const [selectedAlumni, setSelectedAlumni] = useState(null);
-    const [requestData, setRequestData] = useState({ purpose: 'career_guidance', message: '' });
-
-    const connectMutation = useMutation({
-        mutationFn: async (details) => {
-            return axios.post('/api/student/request-mentorship',
-                { alumni_id: details.alumniId, purpose: details.purpose, message: details.message },
-                { headers: { 'Authorization': `Bearer ${user.token}` } }
-            );
+    // Fetch Stats
+    const { data: stats = { followers: 0, following: 0, connections: 0 } } = useQuery({
+        queryKey: ['socialStats'],
+        queryFn: async () => {
+            const { data } = await axios.get('/api/connections/stats', {
+                headers: { 'Authorization': `Bearer ${user.token}` }
+            });
+            return data;
         },
-        onSuccess: () => {
-            queryClient.invalidateQueries(['alumni']);
-            setSelectedAlumni(null);
-            setRequestData({ purpose: 'career_guidance', message: '' });
+        refetchInterval: 10000
+    });
+
+    // Fetch Suggestions
+    const { data: suggestions = [] } = useQuery({
+        queryKey: ['suggestions'],
+        queryFn: async () => {
+            const { data } = await axios.get('/api/connections/suggestions', {
+                headers: { 'Authorization': `Bearer ${user.token}` }
+            });
+            return data;
         }
     });
 
-    const handleRequestSubmit = (e) => {
-        e.preventDefault();
-        connectMutation.mutate({ alumniId: selectedAlumni.id, ...requestData });
-    };
+    // Mutations
+    const likeMutation = useMutation({
+        mutationFn: ({ postId, isDislike }) =>
+            axios.post(`/api/posts/${postId}/like`, { isDislike }, {
+                headers: { 'Authorization': `Bearer ${user.token}` }
+            }),
+        onSuccess: () => queryClient.invalidateQueries(['feed'])
+    });
+
+    const followMutation = useMutation({
+        mutationFn: (followingId) =>
+            axios.post(`/api/connections/follow/${followingId}`, {}, {
+                headers: { 'Authorization': `Bearer ${user.token}` }
+            }),
+        onSuccess: () => {
+            queryClient.invalidateQueries(['suggestions']);
+            queryClient.invalidateQueries(['socialStats']);
+            queryClient.invalidateQueries(['feed']);
+        }
+    });
+
+    const connectMutation = useMutation({
+        mutationFn: (receiverId) =>
+            axios.post('/api/connections/request', { receiverId }, {
+                headers: { 'Authorization': `Bearer ${user.token}` }
+            }),
+        onSuccess: () => queryClient.invalidateQueries(['suggestions'])
+    });
+
+    const commentMutation = useMutation({
+        mutationFn: ({ postId, content }) =>
+            axios.post(`/api/posts/${postId}/comment`, { content }, {
+                headers: { 'Authorization': `Bearer ${user.token}` }
+            }),
+        onSuccess: () => {
+            queryClient.invalidateQueries(['feed']);
+        }
+    });
 
     return (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 py-12">
-            {/* Realtime Synchronizer Status */}
-            <div className="fixed bottom-8 right-8 z-[100]">
-                <div className="flex items-center gap-3 bg-white/90 backdrop-blur-xl px-5 py-3 rounded-2xl shadow-2xl border border-slate-100 transition-all">
-                    <div className={`w-2 h-2 rounded-full ${isFetching ? 'bg-blue-500 animate-pulse' : 'bg-emerald-500'} relative`}>
-                        <div className={`absolute inset-0 rounded-full ${isFetching ? 'bg-blue-500' : 'bg-emerald-500'} animate-ping`}></div>
-                    </div>
-                    <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500">Live Sync Active</span>
-                </div>
-            </div>
+        <div className="max-w-[1400px] mx-auto px-6 py-12">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
 
-            <header className="mb-16">
-                <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-8">
-                    <motion.div
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                    >
-                        <div className="flex items-center gap-3 mb-4">
-                            <div className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-black uppercase tracking-tighter">Directory Alpha</div>
-                            <span className="text-slate-300">/</span>
-                            <span className="text-slate-400 text-[10px] font-bold uppercase">v2.0 Performance</span>
-                        </div>
-                        <h1 className="text-5xl font-extrabold text-slate-900 tracking-tight mb-3">Professional <span className="text-blue-600">Network</span></h1>
-                        <p className="text-slate-500 text-lg max-w-lg leading-relaxed">Instantly connect with the next generation of industry leaders and alumni mentors.</p>
-                    </motion.div>
-
-                    <div className="flex bg-slate-100/80 backdrop-blur-md p-1.5 rounded-[20px] border border-slate-200/50 self-start">
-                        {[
-                            { id: 'explore', label: 'Network', icon: Users },
-                            { id: 'bulletin', label: 'Bulletin', icon: Bell }
-                        ].map(tab => (
-                            <button
-                                key={tab.id}
-                                onClick={() => setActiveTab(tab.id)}
-                                className={`flex items-center gap-2 px-6 py-3 rounded-2xl text-sm font-bold transition-all duration-300 ${activeTab === tab.id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                            >
-                                <tab.icon className={`w-4 h-4 ${activeTab === tab.id ? 'text-blue-600' : ''}`} />
-                                {tab.label}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-            </header>
-
-            {activeTab === 'explore' && (
-                <div className="space-y-12">
-                    {/* Search Deck */}
-                    <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="grid grid-cols-1 lg:grid-cols-12 gap-6"
-                    >
-                        <div className="lg:col-span-8 relative group">
-                            <div className="absolute left-6 top-1/2 -translate-y-1/2 group-focus-within:text-blue-600 transition-colors">
-                                <Search className="w-5 h-5 text-slate-400" />
+                {/* Left Sidebar - Profile & Stats */}
+                <div className="lg:col-span-3 space-y-6">
+                    <div className="premium-card overflow-hidden">
+                        <div className="h-20 bg-gradient-to-r from-blue-600 to-indigo-700"></div>
+                        <div className="px-6 pb-8">
+                            <div className="relative -mt-10 mb-4">
+                                <div className="w-20 h-20 bg-white rounded-3xl p-1 shadow-xl">
+                                    <div className="w-full h-full bg-slate-100 rounded-[20px] flex items-center justify-center text-2xl font-black text-blue-600 uppercase">
+                                        {user.name.charAt(0)}
+                                    </div>
+                                </div>
                             </div>
+                            <h2 className="text-xl font-black text-slate-900 tracking-tight">{user.name}</h2>
+                            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mt-1 mb-6">{user.role} @ {user.college}</p>
+
+                            <div className="space-y-4 pt-6 border-t border-slate-50">
+                                <div className="flex justify-between items-center group cursor-pointer">
+                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">Followers</span>
+                                    <span className="text-sm font-black text-blue-600 bg-blue-50 px-3 py-1 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-all">{stats.followers}</span>
+                                </div>
+                                <div className="flex justify-between items-center group cursor-pointer">
+                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">Following</span>
+                                    <span className="text-sm font-black text-indigo-600 bg-indigo-50 px-3 py-1 rounded-lg group-hover:bg-indigo-600 group-hover:text-white transition-all">{stats.following}</span>
+                                </div>
+                                <div className="flex justify-between items-center group cursor-pointer">
+                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">Connections</span>
+                                    <span className="text-sm font-black text-emerald-600 bg-emerald-50 px-3 py-1 rounded-lg group-hover:bg-emerald-600 group-hover:text-white transition-all">{stats.connections}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="premium-card p-6">
+                        <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">Discovery Pulse</h3>
+                        <div className="space-y-2">
+                            {['Events', 'Groups', 'Hashtags', 'Alumni Meetups'].map(item => (
+                                <button key={item} className="w-full text-left px-4 py-3 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50 hover:text-blue-600 transition-all flex items-center justify-between group">
+                                    {item}
+                                    <Plus className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Central Feed */}
+                <div className="lg:col-span-6 space-y-8">
+                    {/* Filter Bar */}
+                    <div className="premium-card p-6 flex items-center gap-4">
+                        <div className="relative flex-1">
+                            <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                             <input
                                 type="text"
-                                placeholder="Search by name, expertise, or company..."
-                                className="w-full pl-16 pr-6 h-16 bg-white border border-slate-200 rounded-[28px] text-lg font-medium placeholder:text-slate-400 focus:ring-8 focus:ring-blue-500/5 focus:border-blue-500 outline-none transition-all shadow-sm"
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
+                                placeholder="Search the Alumni Network..."
+                                className="w-full pl-16 pr-6 py-5 bg-slate-50 border-none rounded-[28px] text-sm font-bold focus:ring-4 focus:ring-blue-500/10 outline-none transition-all"
                             />
                         </div>
-                        <div className="lg:col-span-4 flex gap-4">
-                            <select
-                                className="flex-1 px-6 h-16 bg-white border border-slate-200 rounded-[28px] text-sm font-bold text-slate-700 outline-none focus:border-blue-500 transition-all appearance-none cursor-pointer"
-                                value={filters.department}
-                                onChange={(e) => setFilters(prev => ({ ...prev, department: e.target.value }))}
-                            >
-                                <option value="">Global Department</option>
-                                <option value="CSE">Technology (CSE)</option>
-                                <option value="ECE">Electronics (ECE)</option>
-                                <option value="IT">Information (IT)</option>
-                                <option value="MECH">Mechanical</option>
-                            </select>
-                            <button className="w-16 h-16 flex items-center justify-center bg-slate-900 text-white rounded-[28px] hover:bg-slate-800 transition-all active:scale-95 shadow-xl shadow-slate-200">
-                                <Zap className="w-5 h-5" />
-                            </button>
-                        </div>
-                    </motion.div>
-
-                    {/* Results Portfolio */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
-                        <AnimatePresence mode="popLayout">
-                            {isLoading ? (
-                                Array.from({ length: 9 }).map((_, i) => (
-                                    <div key={i} className="h-[420px] bg-slate-100 animate-pulse rounded-[40px]"></div>
-                                ))
-                            ) : alumni.length > 0 ? (
-                                alumni.map((person, i) => (
-                                    <motion.div
-                                        key={person.id}
-                                        layout
-                                        initial={{ opacity: 0, scale: 0.9 }}
-                                        animate={{ opacity: 1, scale: 1 }}
-                                        exit={{ opacity: 0, scale: 0.9 }}
-                                        transition={{ delay: i * 0.05 }}
-                                        className="group premium-card p-10 flex flex-col h-[480px] relative overflow-hidden"
-                                    >
-                                        <div className="absolute top-0 right-0 p-8">
-                                            <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-                                        </div>
-
-                                        <div className="flex items-center gap-6 mb-10">
-                                            <div className="w-20 h-20 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-[30px] flex items-center justify-center text-3xl font-black text-white shadow-2xl shadow-blue-200 group-hover:scale-110 transition-transform duration-500">
-                                                {person.name.charAt(0)}
-                                            </div>
-                                            <div>
-                                                <h3 className="text-2xl font-black text-slate-900 leading-tight mb-1">{person.name}</h3>
-                                                <div className="flex items-center gap-2">
-                                                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
-                                                    <span className="text-xs font-black text-blue-600 uppercase tracking-widest">{person.job_role || 'Executive'}</span>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div className="space-y-6 flex-1">
-                                            <div className="p-5 bg-slate-50 rounded-3xl border border-slate-100 group-hover:bg-blue-50/50 group-hover:border-blue-100 transition-colors">
-                                                <div className="flex items-center gap-3 mb-2">
-                                                    <Building className="w-4 h-4 text-slate-400" />
-                                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Base Operations</span>
-                                                </div>
-                                                <p className="text-sm font-bold text-slate-800">{person.company || 'Global Enterprise'}</p>
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div className="p-5 bg-slate-50 rounded-3xl border border-slate-100">
-                                                    <div className="flex items-center gap-2 mb-2">
-                                                        <GraduationCap className="w-3.5 h-3.5 text-slate-400" />
-                                                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Sector</span>
-                                                    </div>
-                                                    <p className="text-[11px] font-black text-slate-800">{person.department}</p>
-                                                </div>
-                                                <div className="p-5 bg-slate-50 rounded-3xl border border-slate-100">
-                                                    <div className="flex items-center gap-2 mb-2">
-                                                        <Zap className="w-3.5 h-3.5 text-slate-400" />
-                                                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Batch</span>
-                                                    </div>
-                                                    <p className="text-[11px] font-black text-slate-800">{person.batch}</p>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div className="mt-10">
-                                            <button
-                                                onClick={() => setSelectedAlumni(person)}
-                                                className="w-full bg-slate-900 group-hover:bg-blue-600 text-white py-5 rounded-[24px] font-black text-xs uppercase tracking-[0.2em] flex items-center justify-center gap-3 transition-all duration-300 hover:shadow-2xl hover:shadow-blue-200 active:scale-[0.98]"
-                                            >
-                                                Request Protocol <ArrowRight className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                    </motion.div>
-                                ))
-                            ) : (
-                                <motion.div
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    className="col-span-full py-32 text-center"
-                                >
-                                    <div className="w-24 h-24 bg-slate-100 rounded-[40px] flex items-center justify-center mx-auto mb-8">
-                                        <Users className="w-10 h-10 text-slate-300" />
-                                    </div>
-                                    <h3 className="text-3xl font-black text-slate-900 mb-3 tracking-tighter">Signal Lost</h3>
-                                    <p className="text-slate-500 font-medium">No connection points matching your current filters.</p>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-                    </div>
-                </div>
-            )}
-
-            {activeTab === 'bulletin' && <BulletinBoard />}
-
-            {/* NextLevel Request Modal */}
-            <AnimatePresence>
-                {selectedAlumni && (
-                    <div className="fixed inset-0 z-[200] flex items-center justify-center p-6">
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            onClick={() => setSelectedAlumni(null)}
-                            className="absolute inset-0 bg-slate-950/60 backdrop-blur-2xl"
-                        />
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.9, y: 40 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.9, y: 40 }}
-                            className="bg-white w-full max-w-xl rounded-[48px] shadow-2xl relative z-10 overflow-hidden border border-white/20"
+                        <button
+                            onClick={() => setIsFilterOpen(!isFilterOpen)}
+                            className={`p-5 rounded-[24px] border transition-all ${isFilterOpen ? 'bg-blue-600 border-blue-600 text-white shadow-xl shadow-blue-200' : 'bg-white border-slate-100 text-slate-400 hover:bg-slate-50'}`}
                         >
-                            <div className="p-12">
-                                <div className="flex items-center justify-between mb-12">
-                                    <div>
-                                        <h3 className="text-4xl font-black text-slate-900 tracking-tighter mb-2">Initialize Connection</h3>
-                                        <p className="text-slate-500 font-bold uppercase text-[10px] tracking-widest">To: {selectedAlumni.name}</p>
-                                    </div>
-                                    <button onClick={() => setSelectedAlumni(null)} className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center hover:bg-red-50 hover:text-red-500 transition-all">
-                                        <X className="w-6 h-6" />
-                                    </button>
-                                </div>
-                                <form onSubmit={handleRequestSubmit} className="space-y-8">
-                                    <div>
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 block ml-2">Mission Purpose</label>
-                                        <div className="grid grid-cols-2 gap-3">
-                                            {['career_guidance', 'resume_review', 'interview_prep', 'referral'].map(p => (
-                                                <button
-                                                    key={p}
-                                                    type="button"
-                                                    onClick={() => setRequestData({ ...requestData, purpose: p })}
-                                                    className={`py-4 px-6 rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all ${requestData.purpose === p ? 'bg-blue-600 border-blue-600 text-white shadow-xl shadow-blue-200' : 'bg-white border-slate-100 text-slate-500 hover:border-blue-200'}`}
-                                                >
-                                                    {p.replace('_', ' ')}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 block ml-2">Personal Briefing</label>
-                                        <textarea
-                                            className="w-full p-8 bg-slate-50 border border-slate-100 rounded-[32px] text-sm font-medium placeholder:text-slate-300 min-h-[180px] focus:ring-8 focus:ring-blue-500/5 focus:border-blue-600 outline-none transition-all"
-                                            placeholder="Introduce yourself and explain the value of this connection..."
-                                            value={requestData.message}
-                                            onChange={(e) => setRequestData({ ...requestData, message: e.target.value })}
-                                            required
+                            <Filter className="w-6 h-6" />
+                        </button>
+                    </div>
+
+                    <AnimatePresence>
+                        {isFilterOpen && (
+                            <motion.div
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: 'auto' }}
+                                exit={{ opacity: 0, height: 0 }}
+                                className="premium-card p-10 grid grid-cols-2 md:grid-cols-3 gap-6 overflow-hidden"
+                            >
+                                {Object.keys(filters).map(key => (
+                                    <div key={key}>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 block">{key.replace('_', ' ')}</label>
+                                        <input
+                                            type="text"
+                                            value={filters[key]}
+                                            onChange={(e) => setFilters({ ...filters, [key]: e.target.value })}
+                                            className="w-full px-5 py-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold focus:ring-4 focus:ring-blue-500/5 outline-none transition-all"
+                                            placeholder={`Filter by ${key}...`}
                                         />
                                     </div>
-                                    <button
-                                        type="submit"
-                                        className="w-full bg-blue-600 py-6 rounded-[32px] text-white font-black uppercase tracking-[0.3em] text-xs flex items-center justify-center gap-4 hover:bg-blue-700 transition-all shadow-2xl shadow-blue-200 active:scale-95"
-                                        disabled={connectMutation.isPending}
-                                    >
-                                        {connectMutation.isPending ? 'Transmitting...' : 'Send Transmission'} <Zap className="w-5 h-5" />
-                                    </button>
-                                </form>
-                            </div>
-                        </motion.div>
+                                ))}
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+
+                    {/* Feed Content */}
+                    {feedLoading ? (
+                        <div className="py-20 text-center uppercase text-[10px] font-black text-slate-300 tracking-[0.4em] animate-pulse">Syncing Network Feed...</div>
+                    ) : (
+                        <div className="space-y-8">
+                            {feed.length === 0 && (
+                                <div className="premium-card p-20 text-center border-dashed">
+                                    <Zap className="w-12 h-12 text-slate-200 mx-auto mb-6" />
+                                    <p className="text-slate-400 font-bold uppercase text-xs tracking-widest">Connect with alumni to see transmissions</p>
+                                </div>
+                            )}
+                            {feed.map((post, idx) => (
+                                <motion.div
+                                    key={post.id}
+                                    initial={{ opacity: 0, y: 30 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: idx * 0.1 }}
+                                    className="premium-card overflow-hidden"
+                                >
+                                    <div className="p-8">
+                                        <div className="flex items-start justify-between mb-8">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-14 h-14 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl flex items-center justify-center text-xl font-black text-white shadow-xl shadow-blue-100">
+                                                    {post.author_name.charAt(0)}
+                                                </div>
+                                                <div>
+                                                    <h3 className="text-lg font-black text-slate-900 tracking-tighter">{post.author_name}</h3>
+                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mt-1">{post.author_role} • {post.author_college}</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <div className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-[9px] font-black uppercase tracking-widest border border-emerald-100">Mutual Signal</div>
+                                                <MoreHorizontal className="w-5 h-5 text-slate-400 cursor-pointer hover:text-slate-900" />
+                                            </div>
+                                        </div>
+
+                                        <p className="text-slate-700 font-medium leading-[1.8] text-lg mb-8">
+                                            {post.content}
+                                        </p>
+
+                                        {post.image_url && (
+                                            <div className="rounded-[32px] overflow-hidden mb-8 border border-slate-100 shadow-2xl">
+                                                <img src={post.image_url} alt="Post asset" className="w-full object-cover max-h-[400px]" />
+                                            </div>
+                                        )}
+
+                                        <div className="flex items-center justify-between pt-8 border-t border-slate-50">
+                                            <div className="flex items-center gap-6">
+                                                <button
+                                                    onClick={() => likeMutation.mutate({ postId: post.id, isDislike: false })}
+                                                    className={`flex items-center gap-3 font-black text-xs uppercase tracking-widest transition-all ${post.has_liked ? 'text-blue-600' : 'text-slate-400 hover:text-blue-600'}`}
+                                                >
+                                                    <Heart className={`w-6 h-6 ${post.has_liked ? 'fill-blue-600' : ''}`} /> {post.likes_count}
+                                                </button>
+                                                <button
+                                                    onClick={() => likeMutation.mutate({ postId: post.id, isDislike: true })}
+                                                    className="flex items-center gap-3 font-black text-xs uppercase tracking-widest text-slate-400 hover:text-red-600 transition-all"
+                                                >
+                                                    <ThumbsDown className="w-6 h-6" /> {post.dislikes_count}
+                                                </button>
+                                                <button className="flex items-center gap-3 font-black text-xs uppercase tracking-widest text-slate-400 hover:text-indigo-600 transition-all">
+                                                    <MessageSquare className="w-6 h-6" /> {post.comments_count}
+                                                </button>
+                                            </div>
+                                            <button className="p-3 bg-slate-50 text-slate-400 rounded-xl hover:bg-slate-900 hover:text-white transition-all">
+                                                <Share2 className="w-5 h-5" />
+                                            </button>
+                                        </div>
+
+                                        {/* Comment Section */}
+                                        <div className="mt-8 pt-8 border-t border-slate-50 space-y-6">
+                                            <div className="flex gap-4">
+                                                <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center text-xs font-black text-slate-400 uppercase">
+                                                    {user.name.charAt(0)}
+                                                </div>
+                                                <div className="flex-1 relative">
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Write a peer response..."
+                                                        className="w-full pl-6 pr-16 py-3 bg-slate-50 border-none rounded-2xl text-[11px] font-bold outline-none focus:ring-4 focus:ring-indigo-500/5 transition-all"
+                                                        value={commentText[post.id] || ''}
+                                                        onChange={(e) => setCommentText({ ...commentText, [post.id]: e.target.value })}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter' && commentText[post.id]) {
+                                                                commentMutation.mutate({ postId: post.id, content: commentText[post.id] });
+                                                                setCommentText({ ...commentText, [post.id]: '' });
+                                                            }
+                                                        }}
+                                                    />
+                                                    <button
+                                                        onClick={() => {
+                                                            if (commentText[post.id]) {
+                                                                commentMutation.mutate({ postId: post.id, content: commentText[post.id] });
+                                                                setCommentText({ ...commentText, [post.id]: '' });
+                                                            }
+                                                        }}
+                                                        className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-blue-600 hover:scale-110 transition-transform"
+                                                    >
+                                                        <Send className="w-5 h-5" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </motion.div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                {/* Right Sidebar - Suggestions & Pulse */}
+                <div className="lg:col-span-3 space-y-8">
+                    <div className="premium-card p-10">
+                        <div className="flex items-center justify-between mb-10">
+                            <h3 className="text-lg font-black text-slate-900 tracking-tighter">Peer suggestions</h3>
+                            <button className="text-[10px] font-black text-blue-600 uppercase tracking-widest hover:underline">View All</button>
+                        </div>
+                        <div className="space-y-10">
+                            {suggestions.map(s => (
+                                <div key={s.id} className="group relative">
+                                    <div className="flex items-start gap-4">
+                                        <div className="w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center text-lg font-black text-slate-400 uppercase group-hover:bg-blue-600 group-hover:text-white transition-all duration-500">
+                                            {s.name.charAt(0)}
+                                        </div>
+                                        <div className="flex-1">
+                                            <h4 className="text-sm font-black text-slate-900 tracking-tight leading-none mb-1 group-hover:text-blue-600 transition-colors">{s.name}</h4>
+                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.1em] mb-4">{s.job_role || 'Academic Peer'} @ {s.company || s.college}</p>
+                                            <div className="flex gap-2">
+                                                <button
+                                                    onClick={() => followMutation.mutate(s.id)}
+                                                    className="px-4 py-2 bg-slate-900 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-blue-600 transition-all active:scale-95 shadow-lg shadow-slate-100"
+                                                >
+                                                    Follow
+                                                </button>
+                                                <button
+                                                    onClick={() => connectMutation.mutate(s.id)}
+                                                    className="w-10 h-9 bg-white border border-slate-100 text-slate-400 rounded-xl flex items-center justify-center hover:bg-slate-50 hover:text-blue-600 transition-all"
+                                                >
+                                                    <UserPlus className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                            {suggestions.length === 0 && (
+                                <p className="text-center text-[10px] font-black text-slate-300 uppercase tracking-widest py-10">Expanding network...</p>
+                            )}
+                        </div>
                     </div>
-                )}
-            </AnimatePresence>
+
+                    <div className="premium-card p-10 bg-gradient-to-br from-indigo-900 to-black text-white relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 p-10 opacity-10 group-hover:scale-150 transition-transform duration-1000 rotate-12">
+                            <Star className="w-32 h-32 text-indigo-400" />
+                        </div>
+                        <div className="relative z-10">
+                            <div className="flex items-center gap-2 mb-6">
+                                <Sparkles className="w-5 h-5 text-indigo-400" />
+                                <span className="text-[10px] font-black uppercase tracking-[0.3em]">Elite Membership</span>
+                            </div>
+                            <h4 className="text-2xl font-black tracking-tight mb-4 leading-tight">Sync Advanced Features</h4>
+                            <p className="text-xs text-indigo-200/60 font-medium leading-relaxed mb-10">Access exclusive mentorship paths and direct HR channels from verified alumni.</p>
+                            <button className="w-full py-4 bg-white text-black rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-indigo-400 hover:text-white transition-all active:scale-95">Upgrade Protocol</button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            {/* Live Synchronizer Status */}
+            <div className="fixed bottom-8 left-8 z-[100]">
+                <div className="flex items-center gap-3 bg-white/90 backdrop-blur-xl px-5 py-3 rounded-2xl shadow-2xl border border-slate-100 transition-all">
+                    <div className="w-2 h-2 rounded-full bg-blue-500 relative">
+                        <div className="absolute inset-0 rounded-full bg-blue-500 animate-ping"></div>
+                    </div>
+                    <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500">LinkedIn Engine Syncing</span>
+                </div>
+            </div>
         </div>
     );
 };

@@ -1,102 +1,142 @@
 import db from '../config/db.js';
 
-// Send a connection/follow request
-export const sendConnectionRequest = async (req, res) => {
-    const { receiver_id } = req.body;
-    const requester_id = req.user.id;
-
-    if (requester_id === receiver_id) {
-        return res.status(400).json({ message: "You cannot connect with yourself." });
-    }
-
+// Social Functions (Follow/Unfollow)
+export const followUser = async (req, res) => {
+    const followerId = req.user.id;
+    const { followingId } = req.params;
     try {
-        // Check if a request already exists
-        const existing = await db.query(
-            'SELECT * FROM connections WHERE (requester_id = $1 AND receiver_id = $2) OR (requester_id = $2 AND receiver_id = $1)',
-            [requester_id, receiver_id]
-        );
-
-        if (existing.rows.length > 0) {
-            return res.status(400).json({ message: "Relationship already exists or is pending." });
-        }
-
         await db.query(
-            'INSERT INTO connections (requester_id, receiver_id, status) VALUES ($1, $2, \'pending\')',
-            [requester_id, receiver_id]
+            'INSERT INTO follows (follower_id, following_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+            [followerId, followingId]
         );
-
-        res.status(201).json({ message: 'Connection request sent successfully.' });
-    } catch (error) {
-        console.error('Connection Request Error:', error);
-        res.status(500).json({ message: 'Server error sending connection request' });
+        res.json({ message: 'Followed successfully' });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
     }
 };
 
-// Accept/Reject connection request
-export const updateConnectionStatus = async (req, res) => {
-    const { connection_id, status } = req.body; // status: 'accepted' or 'rejected'
-    const user_id = req.user.id;
-
-    if (!['accepted', 'rejected'].includes(status)) {
-        return res.status(400).json({ message: "Invalid status." });
-    }
-
+export const unfollowUser = async (req, res) => {
+    const followerId = req.user.id;
+    const { followingId } = req.params;
     try {
-        // Only the receiver can update the status
-        const updateResult = await db.query(
-            'UPDATE connections SET status = $1 WHERE id = $2 AND receiver_id = $3 RETURNING *',
-            [status, connection_id, user_id]
+        await db.query(
+            'DELETE FROM follows WHERE follower_id = $1 AND following_id = $2',
+            [followerId, followingId]
         );
+        res.json({ message: 'Unfollowed successfully' });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+};
 
-        if (updateResult.rows.length === 0) {
-            return res.status(404).json({ message: "Connection request not found or unauthorized." });
+export const getConnectionStats = async (req, res) => {
+    const userId = req.user.id;
+    try {
+        const followers = await db.query('SELECT COUNT(*) FROM follows WHERE following_id = $1', [userId]);
+        const following = await db.query('SELECT COUNT(*) FROM follows WHERE follower_id = $1', [userId]);
+        const connections = await db.query(`
+            SELECT COUNT(*) FROM connections 
+            WHERE (requester_id = $1 OR receiver_id = $1) AND status = 'accepted'
+        `, [userId]);
+
+        res.json({
+            followers: parseInt(followers.rows[0].count),
+            following: parseInt(following.rows[0].count),
+            connections: parseInt(connections.rows[0].count)
+        });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+};
+
+export const getSuggestions = async (req, res) => {
+    const userId = req.user.id;
+    try {
+        const userRes = await db.query('SELECT college, role FROM users WHERE id = $1', [userId]);
+        const { college, role } = userRes.rows[0];
+
+        let suggestions;
+        if (role === 'student') {
+            suggestions = await db.query(`
+                SELECT u.id, u.name, u.college, ap.company, ap.job_role, ap.batch
+                FROM users u
+                JOIN alumni_profiles ap ON u.id = ap.user_id
+                WHERE u.college = $1 AND u.id != $2
+                AND u.id NOT IN (SELECT following_id FROM follows WHERE follower_id = $2)
+                AND u.id NOT IN (SELECT receiver_id FROM connections WHERE requester_id = $2)
+                AND u.id NOT IN (SELECT requester_id FROM connections WHERE receiver_id = $2)
+                LIMIT 10
+            `, [college, userId]);
+        } else {
+            suggestions = await db.query(`
+                SELECT u.id, u.name, u.college, sp.department, sp.batch
+                FROM users u
+                JOIN student_profiles sp ON u.id = sp.user_id
+                WHERE u.college = $1 AND u.id != $2
+                AND u.id NOT IN (SELECT following_id FROM follows WHERE follower_id = $2)
+                LIMIT 10
+            `, [college, userId]);
         }
-
-        res.json({ message: `Connection ${status} successfully.` });
-    } catch (error) {
-        console.error('Update Connection Error:', error);
-        res.status(500).json({ message: 'Server error updating connection' });
+        res.json(suggestions.rows);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
     }
 };
 
-// Get pending requests for current user (Alumni usually)
+// Original Connection Functions
+export const sendConnectionRequest = async (req, res) => {
+    const requesterId = req.user.id;
+    const { receiverId } = req.body;
+    try {
+        const request = await db.query(
+            'INSERT INTO connections (requester_id, receiver_id, status) VALUES ($1, $2, $3) RETURNING *',
+            [requesterId, receiverId, 'pending']
+        );
+        res.status(201).json(request.rows[0]);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+};
+
+export const updateConnectionStatus = async (req, res) => {
+    const { connectionId, status } = req.body;
+    try {
+        const result = await db.query(
+            'UPDATE connections SET status = $1 WHERE id = $2 RETURNING *',
+            [status, connectionId]
+        );
+        res.json(result.rows[0]);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+};
+
 export const getPendingRequests = async (req, res) => {
-    const user_id = req.user.id;
-
+    const userId = req.user.id;
     try {
-        const result = await db.query(
-            `SELECT c.id as connection_id, u.id as requester_id, u.name, u.email, sp.department, sp.batch, sp.resume_url 
-             FROM connections c 
-             JOIN users u ON c.requester_id = u.id 
-             LEFT JOIN student_profiles sp ON u.id = sp.user_id
-             WHERE c.receiver_id = $1 AND c.status = 'pending'`,
-            [user_id]
-        );
-
-        res.json(result.rows);
-    } catch (error) {
-        console.error('Get Pending Requests Error:', error);
-        res.status(500).json({ message: 'Server error fetching pending requests' });
+        const requests = await db.query(`
+            SELECT c.*, u.name as requester_name, u.college as requester_college
+            FROM connections c
+            JOIN users u ON c.requester_id = u.id
+            WHERE c.receiver_id = $1 AND c.status = 'pending'
+        `, [userId]);
+        res.json(requests.rows);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
     }
 };
 
-// Get connections (friends/verified)
 export const getMyConnections = async (req, res) => {
-    const user_id = req.user.id;
-
+    const userId = req.user.id;
     try {
-        const result = await db.query(
-            `SELECT u.id, u.name, u.role, u.college, u.email, c.status
-             FROM connections c
-             JOIN users u ON (c.requester_id = u.id OR c.receiver_id = u.id)
-             WHERE (c.requester_id = $1 OR c.receiver_id = $1) 
-             AND u.id != $1 AND c.status = 'accepted'`,
-            [user_id]
-        );
-
-        res.json(result.rows);
-    } catch (error) {
-        console.error('Get Connections Error:', error);
-        res.status(500).json({ message: 'Server error fetching connections' });
+        const connections = await db.query(`
+            SELECT u.id, u.name, u.role, u.college
+            FROM connections c
+            JOIN users u ON (u.id = CASE WHEN c.requester_id = $1 THEN c.receiver_id ELSE c.requester_id END)
+            WHERE (c.requester_id = $1 OR c.receiver_id = $1) AND c.status = 'accepted'
+        `, [userId]);
+        res.json(connections.rows);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
     }
 };
