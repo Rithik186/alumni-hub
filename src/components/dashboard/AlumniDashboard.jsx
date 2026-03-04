@@ -1,334 +1,645 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-    Activity, Bell, Settings, Check, X,
-    GraduationCap, Briefcase, LayoutDashboard,
-    Users, MessageSquare, ShieldCheck, Power,
-    FileText, User, ChevronRight, Clock,
-    Zap, Rocket, Target, Star, Building,
-    Send, Plus, Image as ImageIcon, Sparkles
+    Bell, Settings, Check, X,
+    GraduationCap, LayoutDashboard,
+    MessageSquare, ShieldCheck,
+    Send, Image as ImageIcon, Sparkles,
+    Video, Heart, Share2, Search,
+    TrendingUp, Award, UserPlus,
+    MoreHorizontal, Trash2, CornerDownRight,
+    Loader2
 } from 'lucide-react';
 import { useUser } from '../../context/UserContext';
 import axios from 'axios';
-import BulletinBoard from './BulletinBoard';
 
 const AlumniDashboard = () => {
     const { user } = useUser();
     const queryClient = useQueryClient();
-    const [activeTab, setActiveTab] = useState('overview');
-    const [postContent, setPostContent] = useState('');
+    const [activeTab, setActiveTab] = useState('feed');
     const [isPosting, setIsPosting] = useState(false);
+    const [expandedPostId, setExpandedPostId] = useState(null);
+    const [postData, setPostData] = useState({
+        content: '',
+        image_url: '',
+        video_url: ''
+    });
 
-    // Realtime Sync Engine (2s Polling)
-    const { data: dashboardData, isLoading, isFetching } = useQuery({
+    // --- DATA SYNC ---
+    const { data: dashboardData, isLoading } = useQuery({
         queryKey: ['alumniDashboard'],
         queryFn: async () => {
-            const [requestsRes, profileRes] = await Promise.all([
-                axios.get('/api/alumni/requests', { headers: { 'Authorization': `Bearer ${user.token}` } }),
+            const [followRequestsRes, profileRes] = await Promise.all([
+                axios.get('/api/connections/requests', { headers: { 'Authorization': `Bearer ${user.token}` } }),
                 axios.get('/api/auth/me', { headers: { 'Authorization': `Bearer ${user.token}` } })
             ]);
-            return { requests: requestsRes.data, profile: profileRes.data };
+            return { requests: followRequestsRes.data, profile: profileRes.data };
         },
-        refetchInterval: 2000,
-        refetchOnWindowFocus: true
+        refetchInterval: 5000
     });
 
-    const updateMutation = useMutation({
-        mutationFn: async ({ requestId, status }) => {
-            return axios.patch(`/api/mentorship/${requestId}/status`, { status }, {
+    const { data: notifications = [] } = useQuery({
+        queryKey: ['notifications'],
+        queryFn: async () => {
+            const { data } = await axios.get('/api/notifications', {
                 headers: { 'Authorization': `Bearer ${user.token}` }
             });
+            return data;
         },
-        onSuccess: () => {
-            queryClient.invalidateQueries(['alumniDashboard']);
-        }
+        refetchInterval: 3000
     });
 
-    const toggleAvailabilityMutation = useMutation({
-        mutationFn: async () => {
-            return axios.patch('/api/alumni/mentorship-status', {}, {
+    const { data: stats = { followers: 0, following: 120 } } = useQuery({
+        queryKey: ['socialStats'],
+        queryFn: async () => {
+            const { data } = await axios.get('/api/connections/stats', {
                 headers: { 'Authorization': `Bearer ${user.token}` }
             });
+            return data;
         },
-        onSuccess: () => {
-            queryClient.invalidateQueries(['alumniDashboard']);
-        }
+        refetchInterval: 10000
     });
+
+    const { data: myPosts = [] } = useQuery({
+        queryKey: ['myPosts'],
+        queryFn: async () => {
+            const { data } = await axios.get('/api/posts/feed', {
+                headers: { 'Authorization': `Bearer ${user.token}` }
+            });
+            return data; // Backend returns all feed posts mixed
+        },
+        refetchInterval: 5000
+    });
+
+    // --- MUTATIONS ---
+    const handleMediaUpload = async (e, type) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            // Optimistic update or loading state could go here
+            console.log('Uploading...');
+            const { data } = await axios.post('/api/upload/media', formData, {
+                headers: {
+                    'Authorization': `Bearer ${user.token}`,
+                    // Axios sets multipart automatically when data is FormData, but explicit is fine
+                }
+            });
+            console.log('Uploaded:', data);
+
+            if (type === 'image') {
+                setPostData(prev => ({ ...prev, image_url: data.url, video_url: '' }));
+            } else {
+                setPostData(prev => ({ ...prev, video_url: data.url, image_url: '' }));
+            }
+        } catch (err) {
+            console.error('Initial Upload Error:', err);
+            // Fallback for simple error alert
+            alert('Upload failed. Please try again.');
+        }
+    };
 
     const createPostMutation = useMutation({
-        mutationFn: async (content) => {
-            return axios.post('/api/posts', { content }, {
-                headers: { 'Authorization': `Bearer ${user.token}` }
-            });
-        },
+        mutationFn: async (data) => axios.post('/api/posts', data, {
+            headers: { 'Authorization': `Bearer ${user.token}` }
+        }),
         onSuccess: () => {
-            setPostContent('');
+            setPostData({ content: '', image_url: '', video_url: '' });
             setIsPosting(false);
-            queryClient.invalidateQueries(['feed']);
-            alert('Achievement Broadcasted Successfully!');
+            queryClient.invalidateQueries(['myPosts']);
         }
+    });
+
+    const deletePostMutation = useMutation({
+        mutationFn: async (postId) => axios.delete(`/api/posts/${postId}`, {
+            headers: { 'Authorization': `Bearer ${user.token}` }
+        }),
+        onSuccess: () => {
+            queryClient.invalidateQueries(['myPosts']);
+        }
+    });
+
+    const updateFollowMutation = useMutation({
+        mutationFn: async ({ followerId, status }) => axios.put('/api/connections/follow/status', { followerId, status }, {
+            headers: { 'Authorization': `Bearer ${user.token}` }
+        }),
+        onSuccess: () => {
+            queryClient.invalidateQueries(['alumniDashboard']);
+            queryClient.invalidateQueries(['socialStats']);
+            queryClient.invalidateQueries(['notifications']);
+        }
+    });
+
+    const markReadMutation = useMutation({
+        mutationFn: async (id) => axios.put(`/api/notifications/${id}/read`, {}, {
+            headers: { 'Authorization': `Bearer ${user.token}` }
+        }),
+        onSuccess: () => queryClient.invalidateQueries(['notifications'])
+    });
+
+    const likeMutation = useMutation({
+        mutationFn: ({ postId, isDislike }) =>
+            axios.post(`/api/posts/${postId}/like`, { isDislike }, {
+                headers: { 'Authorization': `Bearer ${user.token}` }
+            }),
+        onSuccess: () => queryClient.invalidateQueries(['myPosts'])
     });
 
     if (isLoading) return (
-        <div className="flex items-center justify-center min-h-[600px]">
-            <div className="w-12 h-12 border-4 border-blue-600/20 border-t-blue-600 rounded-full animate-spin"></div>
+        <div className="flex items-center justify-center min-h-screen bg-slate-50">
+            <div className="w-10 h-10 border-4 border-violet-200 border-t-violet-600 rounded-full animate-spin"></div>
         </div>
     );
 
-    const profile = dashboardData?.profile?.profile;
-    const isAvailable = profile?.mentorship_available;
-    const requests = dashboardData?.requests || [];
-    const pendingRequests = requests.filter(r => r.status === 'pending');
-    const acceptedRequests = requests.filter(r => r.status === 'accepted');
+    const followRequests = dashboardData?.requests || [];
+    const unreadNotifications = notifications.filter(n => !n.is_read);
 
     return (
-        <div className="max-w-7xl mx-auto px-6 lg:px-12 py-16">
-            {/* Realtime Synchronizer Status */}
-            <div className="fixed bottom-8 right-8 z-[100]">
-                <div className="flex items-center gap-3 bg-white/90 backdrop-blur-xl px-5 py-3 rounded-2xl shadow-2xl border border-slate-100 transition-all">
-                    <div className={`w-2 h-2 rounded-full ${isFetching ? 'bg-indigo-500 animate-pulse' : 'bg-emerald-500'} relative`}>
-                        <div className={`absolute inset-0 rounded-full ${isFetching ? 'bg-indigo-500' : 'bg-emerald-500'} animate-ping`}></div>
-                    </div>
-                    <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500">System Live</span>
-                </div>
-            </div>
+        <div className="min-h-screen bg-[#F8FAFC] font-sans text-slate-900">
 
-            <header className="mb-20">
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-12">
+            {/* Clean Modern Navbar */}
+            <nav className="sticky top-0 z-[100] bg-white/80 backdrop-blur-md border-b border-slate-200 px-6 py-3">
+                <div className="max-w-7xl mx-auto flex items-center justify-between">
                     <div className="flex items-center gap-8">
-                        <div className="relative group">
-                            <div className="absolute inset-0 bg-indigo-500 rounded-[30px] blur-2xl opacity-20 group-hover:opacity-40 transition-opacity"></div>
-                            <div className="w-24 h-24 bg-gradient-to-br from-indigo-600 to-violet-700 rounded-[30px] flex items-center justify-center text-4xl font-black text-white relative z-10 shadow-2xl shadow-indigo-100">
+                        <div className="flex items-center gap-2.5">
+                            <div className="w-10 h-10 bg-gradient-to-br from-violet-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-violet-200">
+                                <Sparkles className="w-5 h-5 text-white" />
+                            </div>
+                            <span className="text-xl font-bold bg-gradient-to-r from-violet-700 to-indigo-700 bg-clip-text text-transparent">AlumniHub</span>
+                        </div>
+                        <div className="hidden md:flex items-center gap-2 bg-slate-100/50 px-4 py-2.5 rounded-xl border border-slate-200 focus-within:border-violet-300 focus-within:ring-2 focus-within:ring-violet-100 transition-all w-80">
+                            <Search className="w-4 h-4 text-slate-400" />
+                            <input type="text" placeholder="Search for alumni, jobs, or posts..." className="bg-transparent border-none outline-none text-sm w-full placeholder:text-slate-400" />
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                        <button onClick={() => setActiveTab('notifications')} className="relative p-2.5 text-slate-500 hover:text-violet-600 hover:bg-violet-50 rounded-xl transition-all">
+                            <Bell className="w-5 h-5" />
+                            {unreadNotifications.length > 0 && (
+                                <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-white"></span>
+                            )}
+                        </button>
+                        <div className="h-8 w-px bg-slate-200"></div>
+                        <div className="flex items-center gap-3 pl-2">
+                            <div className="text-right hidden sm:block">
+                                <p className="text-sm font-bold text-slate-800">{user.name}</p>
+                                <p className="text-xs font-medium text-slate-500">Pro Member</p>
+                            </div>
+                            <div className="w-10 h-10 bg-gradient-to-br from-violet-100 to-indigo-100 rounded-full border-2 border-white shadow-sm flex items-center justify-center text-violet-700 font-bold">
                                 {user.name.charAt(0)}
                             </div>
-                            <div className="absolute -bottom-2 -right-2 w-10 h-10 bg-white rounded-2xl flex items-center justify-center shadow-lg border border-slate-100 z-20">
-                                <Star className="w-5 h-5 text-amber-500 fill-amber-500" />
-                            </div>
                         </div>
-                        <div>
-                            <p className="text-indigo-600 font-extrabold uppercase text-[10px] tracking-[0.3em] mb-3">Professional Suite</p>
-                            <h1 className="text-5xl font-black text-slate-900 tracking-tighter mb-2">Morning, {user.name.split(' ')[0]}</h1>
-                            <div className="flex items-center gap-4 text-slate-500 font-bold">
-                                <span className="flex items-center gap-2"><Briefcase className="w-4 h-4" /> {profile?.job_role || 'Executive'}</span>
-                                <span className="text-slate-200">|</span>
-                                <span className="flex items-center gap-2"><Building className="w-4 h-4" /> {profile?.company || 'Network Partner'}</span>
+                    </div>
+                </div>
+            </nav>
+
+            <div className="max-w-7xl mx-auto grid grid-cols-12 gap-8 px-6 py-8">
+
+                {/* LEFT SIDEBAR */}
+                <div className="col-span-12 lg:col-span-3 space-y-6">
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden group">
+                        <div className="h-24 bg-gradient-to-r from-violet-600 to-indigo-600 relative overflow-hidden">
+                            <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-20 transition-opacity"></div>
+                        </div>
+                        <div className="px-6 pb-6 text-center relative">
+                            <div className="relative -mt-10 mb-4">
+                                <div className="w-20 h-20 bg-white rounded-3xl p-1 shadow-xl">
+                                    <div className="w-full h-full bg-slate-100 rounded-[20px] flex items-center justify-center text-2xl font-black text-violet-600 uppercase overflow-hidden bg-cover bg-center" style={{ backgroundImage: user.profile_picture ? `url(${user.profile_picture})` : 'none' }}>
+                                        {!user.profile_picture && user.name.charAt(0)}
+                                    </div>
+                                </div>
+                                <Link to="/profile" className="absolute bottom-0 right-0 p-1.5 bg-slate-900 text-white rounded-xl shadow-lg border border-white hover:bg-violet-600 transition-colors">
+                                    <Settings className="w-3 h-3" />
+                                </Link>
+                            </div>
+                            <div className="mt-3">
+                                <h3 className="text-lg font-bold text-slate-900">{user.name}</h3>
+                                <p className="text-sm text-slate-500 font-medium">{dashboardData?.profile?.profile?.job_role || 'Alumni Member'}</p>
+                            </div>
+                            <div className="mt-6 flex items-center justify-center gap-8 border-t border-slate-100 pt-6">
+                                <div>
+                                    <p className="text-lg font-bold text-slate-900">{stats.followers}</p>
+                                    <p className="text-xs text-slate-500 font-medium uppercase tracking-wide">Followers</p>
+                                </div>
+                                <div>
+                                    <p className="text-lg font-bold text-slate-900">{myPosts.filter(p => p.user_id === user.id).length}</p>
+                                    <p className="text-xs text-slate-500 font-medium uppercase tracking-wide">Posts</p>
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    <div className="flex bg-slate-100/60 backdrop-blur-md p-2 rounded-[28px] border border-slate-200/50">
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-2">
                         {[
-                            { id: 'overview', label: 'Dashboard', icon: LayoutDashboard },
-                            { id: 'requests', label: 'Inbox', icon: Bell, count: pendingRequests.length },
-                            { id: 'broadcast', label: 'Share', icon: Send }
-                        ].map(tab => (
+                            { id: 'feed', label: 'News Feed', icon: LayoutDashboard },
+                            { id: 'requests', label: 'Connections', icon: UserPlus, badge: followRequests.length },
+                            { id: 'notifications', label: 'Notifications', icon: Bell, badge: unreadNotifications.length },
+                            { id: 'analytics', label: 'Analytics', icon: TrendingUp },
+                            { id: 'settings', label: 'Settings', icon: Settings }
+                        ].map(item => (
                             <button
-                                key={tab.id}
-                                onClick={() => setActiveTab(tab.id)}
-                                className={`flex items-center gap-3 px-8 py-4 rounded-[22px] text-xs font-black uppercase tracking-widest transition-all duration-500 ${activeTab === tab.id ? 'bg-white text-slate-900 shadow-xl' : 'text-slate-500 hover:text-slate-800'}`}
+                                key={item.id}
+                                onClick={() => setActiveTab(item.id)}
+                                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all font-medium text-sm mb-1 ${activeTab === item.id
+                                    ? 'bg-violet-50 text-violet-700 font-bold'
+                                    : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                                    }`}
                             >
-                                <tab.icon className={`w-4 h-4 ${activeTab === tab.id ? 'text-indigo-600' : ''}`} />
-                                {tab.label}
-                                {tab.count > 0 && (
-                                    <span className="ml-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-[10px] shadow-lg shadow-red-200 animate-bounce">
-                                        {tab.count}
+                                <div className="flex items-center gap-3">
+                                    <item.icon className={`w-5 h-5 ${activeTab === item.id ? 'text-violet-600' : 'text-slate-400'}`} />
+                                    {item.label}
+                                </div>
+                                {item.badge > 0 && (
+                                    <span className="bg-rose-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                                        {item.badge}
                                     </span>
                                 )}
                             </button>
                         ))}
                     </div>
                 </div>
-            </header>
 
-            <main>
-                {activeTab === 'broadcast' && (
-                    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-3xl mx-auto">
-                        <div className="premium-card p-12">
-                            <div className="flex items-center gap-4 mb-10">
-                                <div className="p-4 bg-indigo-50 text-indigo-600 rounded-2xl"><Sparkles className="w-6 h-6" /></div>
-                                <div>
-                                    <h3 className="text-2xl font-black text-slate-900 tracking-tighter">Share Achievement</h3>
-                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest uppercase">Visible to your student network</p>
-                                </div>
+                {/* MAIN FEED */}
+                <div className="col-span-12 lg:col-span-6 space-y-6">
+
+                    {/* Create Post */}
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
+                        <div className="flex gap-4">
+                            <div className="w-10 h-10 bg-slate-100 rounded-full flex-shrink-0 flex items-center justify-center text-slate-500 font-bold">
+                                {user.name.charAt(0)}
                             </div>
-                            <textarea
-                                value={postContent}
-                                onChange={(e) => setPostContent(e.target.value)}
-                                className="w-full p-8 bg-slate-50 border-none rounded-[32px] text-lg font-medium min-h-[200px] outline-none focus:ring-4 focus:ring-indigo-500/5 transition-all mb-8"
-                                placeholder="Post an update, achievement, or thoughts..."
-                            />
-                            <div className="flex items-center justify-between">
-                                <button className="flex items-center gap-3 px-6 py-3 bg-slate-100 text-slate-500 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all">
-                                    <ImageIcon className="w-4 h-4" /> Add Asset
-                                </button>
-                                <button
-                                    onClick={() => createPostMutation.mutate(postContent)}
-                                    disabled={!postContent || createPostMutation.isPending}
-                                    className="px-10 py-4 bg-slate-900 text-white rounded-[24px] text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600 shadow-xl shadow-slate-100 transition-all disabled:opacity-50"
+                            <div className="flex-1">
+                                <div
+                                    onClick={() => setIsPosting(true)}
+                                    className={`bg-slate-50 rounded-xl transition-all cursor-text ${isPosting ? 'p-0 bg-transparent' : 'p-3 text-slate-500 text-sm hover:bg-slate-100'}`}
                                 >
-                                    {createPostMutation.isPending ? 'Propagating...' : 'Post Broadcast'}
-                                </button>
-                            </div>
-                        </div>
-                    </motion.div>
-                )}
-
-                {activeTab === 'overview' && (
-                    <div className="space-y-12">
-                        {/* High-Impact Stat Cards */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
-                            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="stat-card group hover:bg-slate-900 transition-all duration-500">
-                                <div className="flex justify-between items-start mb-10">
-                                    <div className="p-4 bg-indigo-50 text-indigo-600 rounded-2xl group-hover:bg-white/10 group-hover:text-white transition-colors"><Rocket className="w-6 h-6" /></div>
-                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest group-hover:text-slate-500">Success Rate</span>
-                                </div>
-                                <div className="text-5xl font-black text-slate-900 mb-1 tracking-tighter group-hover:text-white transition-colors">98%</div>
-                                <p className="text-xs font-bold text-slate-400 group-hover:text-slate-500 transition-colors">Mentorship engagement score</p>
-                            </motion.div>
-
-                            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="stat-card">
-                                <div className="flex justify-between items-start mb-10">
-                                    <div className="p-4 bg-violet-50 text-violet-600 rounded-2xl"><Target className="w-6 h-6" /></div>
-                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Active Links</span>
-                                </div>
-                                <div className="text-5xl font-black text-slate-900 mb-1 tracking-tighter">{acceptedRequests.length}</div>
-                                <p className="text-xs font-bold text-slate-400">Current mentorship sessions</p>
-                            </motion.div>
-
-                            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="premium-card p-4 border-indigo-100 bg-indigo-50/20">
-                                <div className="p-8 space-y-8">
-                                    <div>
-                                        <h3 className="text-xl font-black text-slate-900 mb-2">Network Visibility</h3>
-                                        <p className="text-xs font-bold text-slate-400 leading-relaxed">Turn this on to appear in the student directory for guidance requests.</p>
-                                    </div>
-                                    <button
-                                        onClick={() => toggleAvailabilityMutation.mutate()}
-                                        className={`w-full py-6 rounded-[28px] text-xs font-black uppercase tracking-[0.3em] transition-all flex items-center justify-center gap-4 ${isAvailable ? 'bg-emerald-600 text-white shadow-xl shadow-emerald-100' : 'bg-white border border-slate-200 text-slate-600'}`}
-                                    >
-                                        <div className={`w-2.5 h-2.5 rounded-full ${isAvailable ? 'bg-white animate-pulse' : 'bg-slate-300'}`}></div>
-                                        {isAvailable ? 'System Online' : 'Signal Offline'}
-                                    </button>
-                                </div>
-                            </motion.div>
-                        </div>
-
-                        {/* Recent Requests Feed */}
-                        <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} className="premium-card overflow-hidden">
-                            <div className="p-10 border-b border-slate-100 flex items-center justify-between">
-                                <div>
-                                    <h3 className="text-2xl font-black text-slate-900 tracking-tighter">Live Mentorship Stream</h3>
-                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Real-time update frequency: 2s</p>
-                                </div>
-                                <button onClick={() => setActiveTab('requests')} className="px-6 py-3 bg-slate-50 hover:bg-slate-100 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all">Expand View</button>
-                            </div>
-                            <div className="divide-y divide-slate-100">
-                                <AnimatePresence mode="popLayout">
-                                    {pendingRequests.length > 0 ? (
-                                        pendingRequests.map((req, i) => (
-                                            <motion.div
-                                                key={req.id}
-                                                initial={{ opacity: 0, x: -20 }}
-                                                animate={{ opacity: 1, x: 0 }}
-                                                exit={{ opacity: 0, x: 20 }}
-                                                transition={{ delay: i * 0.1 }}
-                                                className="p-10 flex flex-col lg:flex-row lg:items-center justify-between gap-8 group hover:bg-slate-50/50 transition-all"
-                                            >
-                                                <div className="flex items-center gap-6">
-                                                    <div className="w-16 h-16 bg-white border border-slate-100 text-indigo-600 rounded-2xl flex items-center justify-center text-xl font-black shadow-sm group-hover:scale-110 transition-transform">
-                                                        {req.student_name?.charAt(0)}
-                                                    </div>
-                                                    <div>
-                                                        <h4 className="font-black text-slate-900 text-lg mb-1">{req.student_name}</h4>
-                                                        <div className="flex items-center gap-3">
-                                                            <span className="px-2 py-0.5 bg-indigo-50 text-indigo-600 text-[10px] font-black uppercase tracking-widest rounded-md">{req.purpose.replace('_', ' ')}</span>
-                                                            <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" /> Just now</span>
-                                                        </div>
-                                                    </div>
+                                    {!isPosting ? "Start a post..." : (
+                                        <div className="space-y-3">
+                                            <textarea
+                                                autoFocus
+                                                value={postData.content}
+                                                onChange={(e) => setPostData({ ...postData, content: e.target.value })}
+                                                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 text-slate-900 text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-500 outline-none min-h-[100px] resize-none"
+                                                placeholder="What do you want to share?"
+                                            />
+                                            {(postData.image_url || postData.video_url) && (
+                                                <div className="mt-4 relative rounded-xl border border-slate-200 overflow-hidden bg-slate-50 group">
+                                                    {postData.image_url && <img src={postData.image_url} alt="Attached" className="w-full h-auto max-h-[300px] object-cover" />}
+                                                    {postData.video_url && <span className="p-4 block font-medium">Video attached: {postData.video_url}</span>}
+                                                    <button onClick={() => setPostData({ ...postData, image_url: '', video_url: '' })} className="absolute top-2 right-2 p-1.5 bg-white/80 hover:bg-rose-50 hover:text-rose-600 text-slate-700 rounded-lg shadow-sm backdrop-blur-md transition-colors">
+                                                        <X className="w-4 h-4" />
+                                                    </button>
                                                 </div>
-                                                <div className="flex gap-4">
-                                                    <button onClick={() => updateMutation.mutate({ requestId: req.id, status: 'rejected' })} className="w-12 h-12 bg-white border border-slate-100 rounded-2xl flex items-center justify-center text-slate-400 hover:text-red-500 hover:border-red-100 transition-all"><X className="w-5 h-5" /></button>
-                                                    <button onClick={() => updateMutation.mutate({ requestId: req.id, status: 'accepted' })} className="px-8 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600 transition-all shadow-xl shadow-slate-100 group-hover:shadow-indigo-100">Establish Link</button>
-                                                </div>
-                                            </motion.div>
-                                        ))
-                                    ) : (
-                                        <div className="p-32 text-center">
-                                            <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                                                <MessageSquare className="w-8 h-8 text-slate-200" />
-                                            </div>
-                                            <p className="text-slate-400 font-bold uppercase text-xs tracking-widest">Inbox Zero Frequency</p>
+                                            )}
                                         </div>
                                     )}
-                                </AnimatePresence>
-                            </div>
-                        </motion.div>
-                    </div>
-                )}
+                                </div>
 
-                {activeTab === 'requests' && (
-                    <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className="space-y-8">
-                        <div className="flex items-center justify-between">
-                            <h2 className="text-3xl font-black text-slate-900 tracking-tighter">Transmission Archive</h2>
+                                <div className={`flex items-center justify-between mt-3 ${!isPosting && 'pt-0'}`}>
+                                    <div className="flex gap-2">
+                                        <label className="p-2 text-slate-400 hover:text-violet-600 hover:bg-violet-50 rounded-lg transition-all cursor-pointer">
+                                            <ImageIcon className="w-5 h-5" />
+                                            <input type="file" className="hidden" accept="image/*" onChange={(e) => handleMediaUpload(e, 'image')} />
+                                        </label>
+                                        <label className="p-2 text-slate-400 hover:text-violet-600 hover:bg-violet-50 rounded-lg transition-all cursor-pointer">
+                                            <Video className="w-5 h-5" />
+                                            <input type="file" className="hidden" accept="video/*" onChange={(e) => handleMediaUpload(e, 'video')} />
+                                        </label>
+                                    </div>
+                                    {isPosting && (
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() => setIsPosting(false)}
+                                                className="px-4 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 rounded-lg"
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button
+                                                onClick={() => createPostMutation.mutate(postData)}
+                                                disabled={!postData.content || createPostMutation.isPending}
+                                                className="px-6 py-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold rounded-lg transition-all shadow-md shadow-violet-200 disabled:opacity-50 disabled:shadow-none"
+                                            >
+                                                {createPostMutation.isPending ? 'Posting...' : 'Post'}
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
                         </div>
-                        <div className="grid gap-6">
-                            {requests.length > 0 ? (
-                                requests.map((request) => (
-                                    <motion.div
-                                        key={request.id}
-                                        layout
-                                        className="premium-card p-10 flex flex-col md:flex-row md:items-center justify-between gap-10"
-                                    >
-                                        <div className="flex items-center gap-8 flex-1">
-                                            <div className="w-20 h-20 bg-slate-50 text-slate-400 rounded-3xl flex items-center justify-center text-2xl font-black">{request.student_name?.charAt(0)}</div>
-                                            <div className="space-y-3 flex-1">
-                                                <div className="flex items-center gap-4">
-                                                    <h4 className="text-2xl font-black text-slate-900 tracking-tighter">{request.student_name}</h4>
-                                                    <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${request.status === 'accepted' ? 'bg-emerald-50 text-emerald-600' : request.status === 'rejected' ? 'bg-red-50 text-red-600' : 'bg-indigo-50 text-indigo-600'}`}>
-                                                        {request.status}
-                                                    </span>
+                    </div>
+
+                    {/* Feed */}
+                    {activeTab === 'feed' && (
+                        <div className="space-y-6">
+                            {myPosts.map((post, idx) => (
+                                <motion.div
+                                    key={post.id}
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: idx * 0.05 }}
+                                    className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow"
+                                >
+                                    <div className="p-5">
+                                        <div className="flex items-start justify-between mb-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-600 font-bold border border-slate-200 overflow-hidden bg-cover bg-center" style={{ backgroundImage: post.author_profile_picture ? `url(${post.author_profile_picture})` : 'none' }}>
+                                                    {!post.author_profile_picture && (post.author_name ? post.author_name.charAt(0) : 'U')}
                                                 </div>
-                                                <div className="flex items-center gap-4 text-xs font-bold text-slate-400">
-                                                    <span className="flex items-center gap-1.5 uppercase tracking-widest"><Target className="w-4 h-4" /> {request.purpose.replace('_', ' ')}</span>
-                                                    <span className="text-slate-200">|</span>
-                                                    <span className="flex items-center gap-1.5 uppercase tracking-widest"><GraduationCap className="w-4 h-4" /> {request.department}</span>
-                                                </div>
-                                                <div className="mt-6 p-6 bg-slate-50 rounded-[28px] border border-slate-100 text-slate-600 font-medium italic relative">
-                                                    <div className="absolute -top-3 left-6 px-3 bg-white border border-slate-100 rounded-full text-[9px] font-black text-slate-400 uppercase tracking-widest">Message Payload</div>
-                                                    "{request.message}"
+                                                <div>
+                                                    <h4 className="text-sm font-bold text-slate-900">{post.author_name || 'Alumni Member'}</h4>
+                                                    <p className="text-xs text-slate-500">{post.author_role || 'Member'} • {new Date(post.created_at).toLocaleDateString()}</p>
                                                 </div>
                                             </div>
+                                            {post.user_id === user.id && (
+                                                <button
+                                                    onClick={() => {
+                                                        if (confirm('Are you sure you want to delete this post?')) {
+                                                            deletePostMutation.mutate(post.id);
+                                                        }
+                                                    }}
+                                                    className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                    title="Delete Post"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            )}
                                         </div>
 
-                                        {request.status === 'pending' && (
-                                            <div className="flex flex-col gap-3 min-w-[200px]">
-                                                <button
-                                                    onClick={() => updateMutation.mutate({ requestId: request.id, status: 'accepted' })}
-                                                    className="w-full bg-slate-900 text-white py-5 rounded-[24px] font-black text-[10px] uppercase tracking-widest hover:bg-indigo-600 shadow-xl transition-all active:scale-95"
-                                                >
-                                                    Secure Connection
-                                                </button>
-                                                <button
-                                                    onClick={() => updateMutation.mutate({ requestId: request.id, status: 'rejected' })}
-                                                    className="w-full bg-white border border-slate-200 text-slate-500 py-4 rounded-[24px] font-black text-[10px] uppercase tracking-widest hover:bg-red-50 hover:text-red-500 transition-all active:scale-95"
-                                                >
-                                                    Discard
-                                                </button>
+                                        <p className="text-slate-800 text-sm leading-relaxed whitespace-pre-wrap mb-4">{post.content}</p>
+
+                                        {post.image_url && (
+                                            <div className="rounded-xl overflow-hidden border border-slate-100 mb-4 bg-slate-50">
+                                                <img src={post.image_url} alt="Post" className="w-full h-auto object-cover max-h-[500px]" />
                                             </div>
                                         )}
-                                    </motion.div>
-                                ))
-                            ) : (
-                                <div className="p-32 text-center border-4 border-dashed border-slate-100 rounded-[64px]">
-                                    <Activity className="w-16 h-16 text-slate-200 mx-auto mb-8 animate-pulse" />
-                                    <h3 className="text-3xl font-black text-slate-900 tracking-tighter mb-2">Clean Slate</h3>
-                                    <p className="text-slate-400 font-bold uppercase text-[10px] tracking-[0.2em]">All transmissions cleared</p>
+
+                                        {post.likes_count > 0 && post.liked_by_users?.length > 0 && (
+                                            <div className="flex text-xs text-slate-500 mb-3 px-1">
+                                                <span className="font-bold mr-1 text-slate-700">{post.liked_by_users[0].name}</span>
+                                                {post.likes_count > 1 ? `and ${post.likes_count - 1} others liked this` : 'liked this'}
+                                            </div>
+                                        )}
+                                        <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+                                            <div className="flex items-center gap-6">
+                                                <button onClick={() => likeMutation.mutate({ postId: post.id, isDislike: false })} className="flex items-center gap-1.5 text-slate-500 hover:text-rose-600 transition-colors group">
+                                                    <Heart className={`w-5 h-5 ${post.has_liked ? 'fill-rose-500 text-rose-500' : 'group-hover:scale-110 transition-transform'}`} />
+                                                    <span className="text-sm font-medium">{post.likes_count || 0}</span>
+                                                </button>
+                                                <button
+                                                    onClick={() => setExpandedPostId(expandedPostId === post.id ? null : post.id)}
+                                                    className={`flex items-center gap-1.5 transition-colors group ${expandedPostId === post.id ? 'text-violet-600' : 'text-slate-500 hover:text-violet-600'}`}
+                                                >
+                                                    <MessageSquare className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                                                    <span className="text-sm font-medium">{post.comments_count || 0}</span>
+                                                </button>
+                                            </div>
+                                            <button className="text-slate-400 hover:text-slate-600">
+                                                <Share2 className="w-5 h-5" />
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Comments Section */}
+                                    <AnimatePresence>
+                                        {expandedPostId === post.id && (
+                                            <motion.div
+                                                initial={{ height: 0, opacity: 0 }}
+                                                animate={{ height: 'auto', opacity: 1 }}
+                                                exit={{ height: 0, opacity: 0 }}
+                                                className="bg-slate-50/50 border-t border-slate-100"
+                                            >
+                                                <CommentSection postId={post.id} user={user} />
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+                                </motion.div>
+                            ))}
+                        </div>
+                    )}
+
+                    {activeTab === 'requests' && (
+                        <div className="space-y-4">
+                            <h2 className="text-lg font-bold text-slate-900 px-1">Connection Requests</h2>
+                            {followRequests.length === 0 && (
+                                <div className="bg-white rounded-xl p-12 text-center border border-dashed border-slate-200">
+                                    <UserPlus className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+                                    <p className="text-slate-500 text-sm">No pending requests</p>
                                 </div>
                             )}
+                            {followRequests.map(req => (
+                                <div key={req.follower_id} className="bg-white p-5 rounded-xl border border-slate-200 flex items-center justify-between shadow-sm">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center font-bold text-lg">
+                                            {req.follower_name.charAt(0)}
+                                        </div>
+                                        <div>
+                                            <h4 className="font-bold text-slate-900">{req.follower_name}</h4>
+                                            <p className="text-xs text-slate-500">{req.follower_college}</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => updateFollowMutation.mutate({ followerId: req.follower_id, status: 'rejected' })}
+                                            className="p-2.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                        >
+                                            <X className="w-5 h-5" />
+                                        </button>
+                                        <button
+                                            onClick={() => updateFollowMutation.mutate({ followerId: req.follower_id, status: 'accepted' })}
+                                            className="px-5 py-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold rounded-lg transition-all shadow-sm"
+                                        >
+                                            Accept
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
-                    </motion.div>
-                )}
-            </main>
+                    )}
+
+                    {activeTab === 'notifications' && (
+                        <div className="space-y-4">
+                            <div className="flex items-center justify-between px-1">
+                                <h2 className="text-lg font-bold text-slate-900">Notifications</h2>
+                                <button className="text-xs font-bold text-violet-600 hover:text-violet-700">Mark all as read</button>
+                            </div>
+                            {notifications.map(n => (
+                                <div
+                                    key={n.id}
+                                    onClick={() => markReadMutation.mutate(n.id)}
+                                    className={`p-4 rounded-xl border transition-all flex items-center gap-4 cursor-pointer ${n.is_read ? 'bg-white border-slate-200' : 'bg-violet-50/50 border-violet-100 shadow-sm'
+                                        }`}
+                                >
+                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${n.type === 'like' ? 'bg-rose-100 text-rose-600' : 'bg-indigo-100 text-indigo-600'
+                                        }`}>
+                                        {n.type === 'like' ? <Heart className="w-5 h-5" /> : <MessageSquare className="w-5 h-5" />}
+                                    </div>
+                                    <div className="flex-1">
+                                        <p className="text-sm text-slate-600">
+                                            <span className="font-bold text-slate-900">{n.sender_name}</span> {n.content}
+                                        </p>
+                                        <p className="text-xs text-slate-400 mt-1">{new Date(n.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                                    </div>
+                                    {!n.is_read && <div className="w-2 h-2 bg-violet-600 rounded-full"></div>}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                {/* RIGHT SIDEBAR */}
+                <div className="col-span-12 lg:col-span-3 space-y-6">
+                    <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+                        <div className="flex items-center gap-2 mb-6 text-slate-400 text-xs font-bold uppercase tracking-wider">
+                            <Award className="w-4 h-4" /> Your Progress
+                        </div>
+                        <div className="space-y-4">
+                            <div className="flex justify-between text-sm">
+                                <span className="font-medium text-slate-600">Profile Engagement</span>
+                                <span className="font-bold text-emerald-600">+12%</span>
+                            </div>
+                            <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                                <div className="bg-gradient-to-r from-violet-500 to-indigo-500 h-full rounded-full w-[75%]"></div>
+                            </div>
+                            <p className="text-xs text-slate-500 text-center pt-2">Keep posting to reach "Star Alumni" status</p>
+                        </div>
+                    </div>
+
+                    <div className="bg-gradient-to-br from-violet-600 to-indigo-700 rounded-2xl p-6 shadow-lg shadow-indigo-200 text-white">
+                        <div className="flex items-center justify-between mb-6">
+                            <span className="text-xs font-bold uppercase tracking-wider flex items-center gap-2">
+                                <Sparkles className="w-4 h-4" /> Campus Bulletin
+                            </span>
+                            <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
+                        </div>
+                        <BulletinWidget />
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const BulletinWidget = () => {
+    const { user } = useUser();
+    const { data: events = [], isLoading } = useQuery({
+        queryKey: ['events'],
+        queryFn: async () => {
+            const { data } = await axios.get('/api/events', {
+                headers: { 'Authorization': `Bearer ${user.token}` }
+            });
+            return data;
+        }
+    });
+
+    if (isLoading) return <div className="h-20 flex items-center justify-center"><Loader2 className="animate-spin w-5 h-5 opacity-50" /></div>;
+
+    if (events.length === 0) return <p className="text-sm opacity-60 text-center py-4">No active notices.</p>;
+
+    return (
+        <div className="space-y-4">
+            {events.slice(0, 3).map(event => (
+                <div key={event.id} className="bg-white/10 backdrop-blur-sm rounded-xl p-3 border border-white/10 hover:bg-white/20 transition-colors cursor-pointer">
+                    <div className="flex justify-between items-start mb-1">
+                        <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${event.type === 'placement' ? 'bg-emerald-500/20 text-emerald-100' : 'bg-violet-500/20 text-violet-100'
+                            }`}>
+                            {event.type}
+                        </span>
+                        <span className="text-[10px] opacity-60">{new Date(event.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
+                    </div>
+                    <h4 className="font-bold text-sm leading-tight mb-1">{event.title}</h4>
+                    <p className="text-xs opacity-70 line-clamp-2">{event.description}</p>
+                </div>
+            ))}
+        </div>
+    );
+};
+
+const CommentSection = ({ postId, user }) => {
+    const queryClient = useQueryClient();
+    const [commentContent, setCommentContent] = useState('');
+
+    const { data: comments = [], isLoading } = useQuery({
+        queryKey: ['comments', postId],
+        queryFn: async () => {
+            const { data } = await axios.get(`/api/posts/${postId}/comments`, {
+                headers: { 'Authorization': `Bearer ${user.token}` }
+            });
+            return data;
+        }
+    });
+
+    const addCommentMutation = useMutation({
+        mutationFn: async (content) => axios.post(`/api/posts/${postId}/comment`, { content }, {
+            headers: { 'Authorization': `Bearer ${user.token}` }
+        }),
+        onSuccess: () => {
+            setCommentContent('');
+            queryClient.invalidateQueries(['comments', postId]);
+            queryClient.invalidateQueries(['myPosts']); // Update count
+        }
+    });
+
+    return (
+        <div className="p-5 space-y-4">
+            {isLoading ? (
+                <div className="flex justify-center p-4">
+                    <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
+                </div>
+            ) : (
+                <div className="space-y-3 max-h-[300px] overflow-y-auto modern-scrollbar">
+                    {comments.length === 0 && (
+                        <p className="text-center text-xs text-slate-400 italic py-2">No comments yet. Be the first!</p>
+                    )}
+                    {comments.map(c => (
+                        <div key={c.id} className="flex gap-3">
+                            <div className="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center text-xs font-bold text-slate-600 flex-shrink-0 overflow-hidden bg-cover bg-center" style={{ backgroundImage: c.user_profile_picture ? `url(${c.user_profile_picture})` : 'none' }}>
+                                {!c.user_profile_picture && (c.user_name ? c.user_name.charAt(0) : 'U')}
+                            </div>
+                            <div className="bg-slate-100/80 rounded-2xl rounded-tl-none px-4 py-2 text-sm">
+                                <p className="font-bold text-slate-900 text-xs mb-0.5">{c.user_name}</p>
+                                <p className="text-slate-700">{c.content}</p>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            <div className="flex flex-col gap-3">
+                <div className="flex flex-wrap gap-2 mb-2">
+                    {['👍', '❤️', '👏', '🔥'].map(emoji => (
+                        <button key={emoji} onClick={() => setCommentContent(prev => prev + emoji)} className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors text-lg">
+                            {emoji}
+                        </button>
+                    ))}
+                    {['Congratulations!', 'Keep going!', 'Great job!', 'Amazing!'].map(text => (
+                        <button key={text} onClick={() => setCommentContent(prev => prev + (prev ? ' ' : '') + text)} className="px-3 py-1.5 bg-slate-100 hover:bg-violet-50 hover:text-violet-600 text-slate-600 rounded-full text-xs font-medium transition-colors">
+                            {text}
+                        </button>
+                    ))}
+                </div>
+                <div className="flex gap-2 relative">
+                    <input
+                        type="text"
+                        value={commentContent}
+                        onChange={(e) => setCommentContent(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && commentContent && addCommentMutation.mutate(commentContent)}
+                        placeholder="Write a comment..."
+                        className="flex-1 bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-500 outline-none transition-all"
+                    />
+                    <button
+                        onClick={() => addCommentMutation.mutate(commentContent)}
+                        disabled={!commentContent || addCommentMutation.isPending}
+                        className="p-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl transition-all disabled:opacity-50 shadow-md shadow-violet-200"
+                    >
+                        <Send className="w-4 h-4" />
+                    </button>
+                </div>
+            </div>
         </div>
     );
 };

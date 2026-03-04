@@ -1,15 +1,53 @@
 import db from '../config/db.js';
 
-// Social Functions (Follow/Unfollow)
+// Social Functions (Follow Request/Accept)
 export const followUser = async (req, res) => {
     const followerId = req.user.id;
     const { followingId } = req.params;
     try {
-        await db.query(
-            'INSERT INTO follows (follower_id, following_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+        // Check if already following/requested
+        const existing = await db.query(
+            'SELECT * FROM follows WHERE follower_id = $1 AND following_id = $2',
             [followerId, followingId]
         );
-        res.json({ message: 'Followed successfully' });
+
+        if (existing.rows.length > 0) {
+            return res.status(400).json({ message: 'Request already exists' });
+        }
+
+        await db.query(
+            'INSERT INTO follows (follower_id, following_id, status) VALUES ($1, $2, $3)',
+            [followerId, followingId, 'pending']
+        );
+
+        // Trigger Notification
+        await db.query(
+            'INSERT INTO notifications (user_id, type, sender_id, content) VALUES ($1, $2, $3, $4)',
+            [followingId, 'follow_request', followerId, 'sent you a follow request']
+        );
+
+        res.json({ message: 'Follow request sent' });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+};
+
+export const updateFollowStatus = async (req, res) => {
+    const followingId = req.user.id; // The one being followed (alumni)
+    const { followerId, status } = req.body;
+    try {
+        if (status === 'accepted') {
+            await db.query(
+                'UPDATE follows SET status = $1 WHERE follower_id = $2 AND following_id = $3',
+                [status, followerId, followingId]
+            );
+        } else if (status === 'rejected') {
+            await db.query(
+                'DELETE FROM follows WHERE follower_id = $2 AND following_id = $3',
+                [followerId, followingId]
+            );
+        }
+        res.json({ message: `Follow request ${status}` });
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
@@ -32,18 +70,29 @@ export const unfollowUser = async (req, res) => {
 export const getConnectionStats = async (req, res) => {
     const userId = req.user.id;
     try {
-        const followers = await db.query('SELECT COUNT(*) FROM follows WHERE following_id = $1', [userId]);
-        const following = await db.query('SELECT COUNT(*) FROM follows WHERE follower_id = $1', [userId]);
-        const connections = await db.query(`
-            SELECT COUNT(*) FROM connections 
-            WHERE (requester_id = $1 OR receiver_id = $1) AND status = 'accepted'
-        `, [userId]);
+        // Only count accepted follows
+        const followers = await db.query('SELECT COUNT(*) FROM follows WHERE following_id = $1 AND status = \'accepted\'', [userId]);
+        const following = await db.query('SELECT COUNT(*) FROM follows WHERE follower_id = $1 AND status = \'accepted\'', [userId]);
 
         res.json({
             followers: parseInt(followers.rows[0].count),
-            following: parseInt(following.rows[0].count),
-            connections: parseInt(connections.rows[0].count)
+            following: parseInt(following.rows[0].count)
         });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+};
+
+export const getFollowRequests = async (req, res) => {
+    const userId = req.user.id;
+    try {
+        const requests = await db.query(`
+            SELECT f.*, u.name as follower_name, u.college as follower_college, u.role as follower_role
+            FROM follows f
+            JOIN users u ON f.follower_id = u.id
+            WHERE f.following_id = $1 AND f.status = 'pending'
+        `, [userId]);
+        res.json(requests.rows);
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
@@ -58,22 +107,22 @@ export const getSuggestions = async (req, res) => {
         let suggestions;
         if (role === 'student') {
             suggestions = await db.query(`
-                SELECT u.id, u.name, u.college, ap.company, ap.job_role, ap.batch
+                SELECT u.id, u.name, u.college, ap.company, ap.job_role, ap.batch,
+                (SELECT status FROM follows WHERE follower_id = $2 AND following_id = u.id) as follow_status
                 FROM users u
                 JOIN alumni_profiles ap ON u.id = ap.user_id
                 WHERE u.college = $1 AND u.id != $2
-                AND u.id NOT IN (SELECT following_id FROM follows WHERE follower_id = $2)
-                AND u.id NOT IN (SELECT receiver_id FROM connections WHERE requester_id = $2)
-                AND u.id NOT IN (SELECT requester_id FROM connections WHERE receiver_id = $2)
+                AND (SELECT status FROM follows WHERE follower_id = $2 AND following_id = u.id) IS NULL
                 LIMIT 10
             `, [college, userId]);
         } else {
             suggestions = await db.query(`
-                SELECT u.id, u.name, u.college, sp.department, sp.batch
+                SELECT u.id, u.name, u.college, sp.department, sp.batch,
+                (SELECT status FROM follows WHERE follower_id = $2 AND following_id = u.id) as follow_status
                 FROM users u
                 JOIN student_profiles sp ON u.id = sp.user_id
                 WHERE u.college = $1 AND u.id != $2
-                AND u.id NOT IN (SELECT following_id FROM follows WHERE follower_id = $2)
+                AND (SELECT status FROM follows WHERE follower_id = $2 AND following_id = u.id) IS NULL
                 LIMIT 10
             `, [college, userId]);
         }
@@ -83,59 +132,14 @@ export const getSuggestions = async (req, res) => {
     }
 };
 
-// Original Connection Functions
-export const sendConnectionRequest = async (req, res) => {
-    const requesterId = req.user.id;
-    const { receiverId } = req.body;
-    try {
-        const request = await db.query(
-            'INSERT INTO connections (requester_id, receiver_id, status) VALUES ($1, $2, $3) RETURNING *',
-            [requesterId, receiverId, 'pending']
-        );
-        res.status(201).json(request.rows[0]);
-    } catch (err) {
-        res.status(500).json({ message: err.message });
-    }
-};
-
-export const updateConnectionStatus = async (req, res) => {
-    const { connectionId, status } = req.body;
-    try {
-        const result = await db.query(
-            'UPDATE connections SET status = $1 WHERE id = $2 RETURNING *',
-            [status, connectionId]
-        );
-        res.json(result.rows[0]);
-    } catch (err) {
-        res.status(500).json({ message: err.message });
-    }
-};
-
-export const getPendingRequests = async (req, res) => {
+// Internal mapping for search results to show requested status
+export const getMyFollowingsStatuses = async (req, res) => {
     const userId = req.user.id;
     try {
-        const requests = await db.query(`
-            SELECT c.*, u.name as requester_name, u.college as requester_college
-            FROM connections c
-            JOIN users u ON c.requester_id = u.id
-            WHERE c.receiver_id = $1 AND c.status = 'pending'
-        `, [userId]);
-        res.json(requests.rows);
-    } catch (err) {
-        res.status(500).json({ message: err.message });
-    }
-};
-
-export const getMyConnections = async (req, res) => {
-    const userId = req.user.id;
-    try {
-        const connections = await db.query(`
-            SELECT u.id, u.name, u.role, u.college
-            FROM connections c
-            JOIN users u ON (u.id = CASE WHEN c.requester_id = $1 THEN c.receiver_id ELSE c.requester_id END)
-            WHERE (c.requester_id = $1 OR c.receiver_id = $1) AND c.status = 'accepted'
-        `, [userId]);
-        res.json(connections.rows);
+        const result = await db.query('SELECT following_id, status FROM follows WHERE follower_id = $1', [userId]);
+        const mapping = {};
+        result.rows.forEach(r => mapping[r.following_id] = r.status);
+        res.json(mapping);
     } catch (err) {
         res.status(500).json({ message: err.message });
     }

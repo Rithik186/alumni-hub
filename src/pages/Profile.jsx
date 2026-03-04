@@ -13,7 +13,7 @@ import { useUser } from '../context/UserContext';
 import Navbar from '../components/landing/Navbar';
 
 const Profile = () => {
-    const { user } = useUser();
+    const { user, login } = useUser();
     const navigate = useNavigate();
     const [profileData, setProfileData] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -34,7 +34,12 @@ const Profile = () => {
                 headers: { 'Authorization': `Bearer ${user.token}` }
             });
             const data = await res.json();
-            if (res.ok) setProfileData(data);
+            if (res.ok) {
+                setProfileData(data);
+                if (data.profile_picture && data.profile_picture !== user.profile_picture) {
+                    login({ ...user, profile_picture: data.profile_picture });
+                }
+            }
             else if (res.status === 401) navigate('/login');
         } catch (err) {
             console.error('Error fetching profile:', err);
@@ -66,6 +71,34 @@ const Profile = () => {
             }
         } catch (err) {
             setMessage('Error uploading resume');
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    const handleProfilePicUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        setUploading(true);
+        const formData = new FormData();
+        formData.append('profile_picture', file);
+
+        try {
+            const res = await fetch('/api/upload/profile-picture', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${user.token}` },
+                body: formData
+            });
+            const data = await res.json();
+            if (res.ok) {
+                setMessage('Profile picture updated!');
+                fetchProfile();
+            } else {
+                setMessage(data.message || 'Upload failed');
+            }
+        } catch (err) {
+            setMessage('Error uploading profile picture');
         } finally {
             setUploading(false);
         }
@@ -115,12 +148,13 @@ const Profile = () => {
 
                             <div className="relative mb-10 inline-block">
                                 <div className="absolute inset-0 bg-blue-500 rounded-[40px] blur-2xl opacity-20 animate-pulse"></div>
-                                <div className="w-32 h-32 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-[40px] flex items-center justify-center text-5xl font-black text-white relative z-10 shadow-2xl group-hover:scale-110 transition-transform duration-500">
-                                    {profileData.name.charAt(0)}
+                                <div className="w-32 h-32 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-[40px] flex items-center justify-center text-5xl font-black text-white relative z-10 shadow-2xl group-hover:scale-110 transition-transform duration-500 overflow-hidden bg-cover bg-center" style={{ backgroundImage: profileData.profile_picture ? `url(${profileData.profile_picture})` : 'none' }}>
+                                    {!profileData.profile_picture && profileData.name.charAt(0)}
                                 </div>
-                                <button className="absolute -bottom-2 -right-2 w-10 h-10 bg-white rounded-2xl flex items-center justify-center shadow-2xl border border-slate-100 z-20 hover:bg-slate-50 transition-colors">
-                                    <Camera className="w-5 h-5 text-slate-400" />
-                                </button>
+                                <label className="absolute -bottom-2 -right-2 w-10 h-10 bg-white rounded-2xl flex items-center justify-center shadow-2xl border border-slate-100 z-20 hover:bg-slate-50 transition-colors cursor-pointer">
+                                    {uploading ? <Loader2 className="w-5 h-5 animate-spin text-blue-600" /> : <Camera className="w-5 h-5 text-slate-400" />}
+                                    <input type="file" className="hidden" accept="image/*" onChange={handleProfilePicUpload} disabled={uploading} />
+                                </label>
                             </div>
 
                             <h2 className="text-3xl font-black text-slate-900 tracking-tighter mb-1">{profileData.name}</h2>
