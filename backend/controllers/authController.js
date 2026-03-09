@@ -61,7 +61,8 @@ export const registerUser = async (req, res) => {
                 ? 'User registered. Please verify your phone number. Note: Alumni accounts require admin approval after verification.'
                 : 'User registered. Please verify your phone number with the OTP.',
             phone_number,
-            otp_sent: true
+            otp_sent: true,
+            mock_otp: otp_code // Added for frontend to naturally display in demo environments
         });
 
     } catch (error) {

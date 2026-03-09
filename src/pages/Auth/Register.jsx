@@ -60,7 +60,9 @@ const Register = () => {
         try {
             const data = await register({ ...formData, role });
             if (data.otp_sent) {
+                setOtp(data.mock_otp || '123456'); // Auto-fill the mock OTP
                 setStep(2);
+                alert(`DEMO MODE: Your OTP is ${data.mock_otp}`);
             } else {
                 setError(data.message || 'Registration failed');
             }
