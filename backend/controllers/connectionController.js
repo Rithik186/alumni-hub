@@ -83,6 +83,50 @@ export const getConnectionStats = async (req, res) => {
     }
 };
 
+export const getFollowers = async (req, res) => {
+    const userId = req.user.id;
+    try {
+        const query = `
+            SELECT u.id, u.name, u.college, u.role, u.profile_picture as avatar, 
+                   COALESCE(ap.job_role, sp.department, 'Member') as status_role
+            FROM follows f
+            JOIN users u ON f.follower_id = u.id
+            LEFT JOIN alumni_profiles ap ON u.id = ap.user_id
+            LEFT JOIN student_profiles sp ON u.id = sp.user_id
+            WHERE f.following_id = $1 AND f.status = 'accepted'
+        `;
+        const result = await db.query(query, [userId]);
+        const followers = result.rows.map(r => ({
+            id: r.id, name: r.name, role: r.status_role + ' @ ' + r.college, avatar: r.avatar
+        }));
+        res.json(followers);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+};
+
+export const getFollowing = async (req, res) => {
+    const userId = req.user.id;
+    try {
+        const query = `
+            SELECT u.id, u.name, u.college, u.role, u.profile_picture as avatar, 
+                   COALESCE(ap.job_role, sp.department, 'Member') as status_role
+            FROM follows f
+            JOIN users u ON f.following_id = u.id
+            LEFT JOIN alumni_profiles ap ON u.id = ap.user_id
+            LEFT JOIN student_profiles sp ON u.id = sp.user_id
+            WHERE f.follower_id = $1 AND f.status = 'accepted'
+        `;
+        const result = await db.query(query, [userId]);
+        const following = result.rows.map(r => ({
+            id: r.id, name: r.name, role: r.status_role + ' @ ' + r.college, avatar: r.avatar
+        }));
+        res.json(following);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+};
+
 export const getFollowRequests = async (req, res) => {
     const userId = req.user.id;
     try {

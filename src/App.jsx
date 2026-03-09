@@ -10,6 +10,8 @@ import Register from './pages/Auth/Register';
 import ForgotPassword from './pages/Auth/ForgotPassword';
 import Profile from './pages/Profile';
 import Dashboard from './pages/Dashboard';
+import Chat from './pages/Chat';
+import Network from './pages/Network';
 
 const LandingPage = () => (
   <>
@@ -50,6 +52,22 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/chat"
+              element={
+                <ProtectedRoute>
+                  <Chat />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/network"
+              element={
+                <ProtectedRoute>
+                  <Network />
                 </ProtectedRoute>
               }
             />

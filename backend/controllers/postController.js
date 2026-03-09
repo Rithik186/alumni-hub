@@ -1,5 +1,24 @@
 import db from '../config/db.js';
 
+export const editPost = async (req, res) => {
+    const { id } = req.params;
+    const { content, image_url, video_url } = req.body;
+    const userId = req.user.id;
+    try {
+        const post = await db.query('SELECT * FROM posts WHERE id = $1', [id]);
+        if (post.rows.length === 0) return res.status(404).json({ message: 'Post not found' });
+        if (post.rows[0].user_id !== userId) return res.status(403).json({ message: 'Unauthorized' });
+
+        const updated = await db.query(
+            'UPDATE posts SET content = $1, image_url = $2, video_url = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4 RETURNING *',
+            [content, image_url, video_url, id]
+        );
+        res.json(updated.rows[0]);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+};
+
 export const createPost = async (req, res) => {
     const { content, image_url, video_url } = req.body;
     const userId = req.user.id;
@@ -77,12 +96,12 @@ export const toggleLike = async (req, res) => {
 
 export const addComment = async (req, res) => {
     const { postId } = req.params;
-    const { content } = req.body;
+    const { content, parentId } = req.body;
     const userId = req.user.id;
     try {
         const comment = await db.query(
-            'INSERT INTO post_comments (post_id, user_id, content) VALUES ($1, $2, $3) RETURNING *',
-            [postId, userId, content]
+            'INSERT INTO post_comments (post_id, user_id, content, parent_id) VALUES ($1, $2, $3, $4) RETURNING *',
+            [postId, userId, content, parentId || null]
         );
 
         // Trigger Notification
@@ -102,15 +121,59 @@ export const addComment = async (req, res) => {
 
 export const getComments = async (req, res) => {
     const { postId } = req.params;
+    const userId = req.user.id;
     try {
         const comments = await db.query(`
-            SELECT c.*, u.name as user_name, u.profile_picture as user_profile_picture
+            SELECT c.*, u.name as user_name, u.profile_picture as user_profile_picture, u.role as user_role,
+                   (SELECT COUNT(*) FROM comment_likes cl WHERE cl.comment_id = c.id) as likes_count,
+                   EXISTS(SELECT 1 FROM comment_likes cl WHERE cl.comment_id = c.id AND cl.user_id = $2) as has_liked
             FROM post_comments c
             JOIN users u ON c.user_id = u.id
             WHERE c.post_id = $1
-            ORDER BY c.created_at ASC
-        `, [postId]);
+            ORDER BY c.is_pinned DESC, c.created_at ASC
+        `, [postId, userId]);
         res.json(comments.rows);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+};
+
+export const toggleCommentLike = async (req, res) => {
+    const { commentId } = req.params;
+    const userId = req.user.id;
+    try {
+        const existing = await db.query('SELECT * FROM comment_likes WHERE comment_id = $1 AND user_id = $2', [commentId, userId]);
+        if (existing.rows.length > 0) {
+            await db.query('DELETE FROM comment_likes WHERE id = $1', [existing.rows[0].id]);
+        } else {
+            await db.query('INSERT INTO comment_likes (comment_id, user_id) VALUES ($1, $2)', [commentId, userId]);
+        }
+        res.json({ message: 'Success' });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+};
+
+export const pinComment = async (req, res) => {
+    const { commentId } = req.params;
+    const userId = req.user.id;
+    try {
+        const commentRes = await db.query('SELECT post_id, is_pinned FROM post_comments WHERE id = $1', [commentId]);
+        if (commentRes.rows.length === 0) return res.status(404).json({ message: 'Comment not found' });
+
+        const postId = commentRes.rows[0].post_id;
+        const postRes = await db.query('SELECT user_id FROM posts WHERE id = $1', [postId]);
+
+        if (postRes.rows[0].user_id !== userId) return res.status(403).json({ message: 'Only post owner can pin' });
+
+        const isPinned = commentRes.rows[0].is_pinned;
+        // Unpin all other comments for this post if we are pinning
+        if (!isPinned) {
+            await db.query('UPDATE post_comments SET is_pinned = false WHERE post_id = $1', [postId]);
+        }
+        await db.query('UPDATE post_comments SET is_pinned = $1 WHERE id = $2', [!isPinned, commentId]);
+
+        res.json({ message: 'Success' });
     } catch (err) {
         res.status(500).json({ message: err.message });
     }

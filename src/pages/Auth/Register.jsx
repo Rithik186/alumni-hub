@@ -16,7 +16,7 @@ const Register = () => {
     const [step, setStep] = useState(1); // 1: Details, 2: OTP
     const [role, setRole] = useState('student');
     const [formData, setFormData] = useState({
-        name: '', email: '', phone_number: '', password: '', college: 'SJC Institute',
+        name: '', email: '', phone_number: '', password: '', college: '',
         department: '', register_number: '', batch: '', // student specific
         company: '', job_role: '' // alumni specific
     });
@@ -285,6 +285,9 @@ const Register = () => {
 
                                     {role === 'student' ? (
                                         <div className="grid grid-cols-2 gap-4">
+                                            <div className="col-span-2">
+                                                <input name="college" placeholder="College Name" onChange={handleChange} required className={inputClasses} />
+                                            </div>
                                             <input name="department" placeholder="Department" onChange={handleChange} required className={inputClasses} />
                                             <input name="batch" placeholder="Batch Year" onChange={handleChange} required className={inputClasses} />
                                             <div className="col-span-2">
@@ -293,6 +296,9 @@ const Register = () => {
                                         </div>
                                     ) : (
                                         <div className="grid grid-cols-2 gap-4">
+                                            <div className="col-span-2">
+                                                <input name="college" placeholder="College Name" onChange={handleChange} required className={inputClasses} />
+                                            </div>
                                             <input name="company" placeholder="Current Company" onChange={handleChange} required className={inputClasses} />
                                             <input name="job_role" placeholder="Designation" onChange={handleChange} required className={inputClasses} />
                                             <input name="department" placeholder="College Dept" onChange={handleChange} required className={inputClasses} />
