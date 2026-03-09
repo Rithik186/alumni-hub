@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useUser } from '../../context/UserContext';
 import axios from 'axios';
+import PostItem from '../shared/PostItem';
 
 const AlumniDashboard = () => {
     const { user } = useUser();
@@ -237,11 +238,28 @@ const AlumniDashboard = () => {
                     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-2">
                         {[
                             { id: 'feed', label: 'News Feed', icon: LayoutDashboard },
-                            { id: 'requests', label: 'Connections', icon: UserPlus, badge: followRequests.length },
+                            { id: 'network', label: 'Network', icon: UserPlus, badge: followRequests.length, path: '/network' },
+                            { id: 'chat', label: 'Messages', icon: MessageSquare, path: '/chat' },
                             { id: 'notifications', label: 'Notifications', icon: Bell, badge: unreadNotifications.length },
                             { id: 'analytics', label: 'Analytics', icon: TrendingUp },
                             { id: 'settings', label: 'Settings', icon: Settings }
-                        ].map(item => (
+                        ].map(item => item.path ? (
+                            <Link
+                                key={item.id}
+                                to={item.path}
+                                className="w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all font-medium text-sm mb-1 text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                            >
+                                <div className="flex items-center gap-3">
+                                    <item.icon className="w-5 h-5 text-slate-400" />
+                                    {item.label}
+                                </div>
+                                {item.badge > 0 && (
+                                    <span className="bg-rose-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                                        {item.badge}
+                                    </span>
+                                )}
+                            </Link>
+                        ) : (
                             <button
                                 key={item.id}
                                 onClick={() => setActiveTab(item.id)}
@@ -265,7 +283,7 @@ const AlumniDashboard = () => {
                 </div>
 
                 {/* MAIN FEED */}
-                <div className="col-span-12 lg:col-span-6 space-y-6">
+                <div className="col-span-12 lg:col-span-9 space-y-6 max-w-4xl mx-auto w-full">
 
                     {/* Create Post */}
                     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
@@ -336,136 +354,20 @@ const AlumniDashboard = () => {
                     {/* Feed */}
                     {activeTab === 'feed' && (
                         <div className="space-y-6">
-                            {myPosts.map((post, idx) => (
-                                <motion.div
-                                    key={post.id}
-                                    initial={{ opacity: 0, y: 10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: idx * 0.05 }}
-                                    className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow"
-                                >
-                                    <div className="p-5">
-                                        <div className="flex items-start justify-between mb-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-600 font-bold border border-slate-200 overflow-hidden bg-cover bg-center" style={{ backgroundImage: post.author_profile_picture ? `url(${post.author_profile_picture})` : 'none' }}>
-                                                    {!post.author_profile_picture && (post.author_name ? post.author_name.charAt(0) : 'U')}
-                                                </div>
-                                                <div>
-                                                    <h4 className="text-sm font-bold text-slate-900">{post.author_name || 'Alumni Member'}</h4>
-                                                    <p className="text-xs text-slate-500">{post.author_role || 'Member'} • {new Date(post.created_at).toLocaleDateString()}</p>
-                                                </div>
-                                            </div>
-                                            {post.user_id === user.id && (
-                                                <button
-                                                    onClick={() => {
-                                                        if (confirm('Are you sure you want to delete this post?')) {
-                                                            deletePostMutation.mutate(post.id);
-                                                        }
-                                                    }}
-                                                    className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                                    title="Delete Post"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </button>
-                                            )}
-                                        </div>
-
-                                        <p className="text-slate-800 text-sm leading-relaxed whitespace-pre-wrap mb-4">{post.content}</p>
-
-                                        {post.image_url && (
-                                            <div className="rounded-xl overflow-hidden border border-slate-100 mb-4 bg-slate-50">
-                                                <img src={post.image_url} alt="Post" className="w-full h-auto object-cover max-h-[500px]" />
-                                            </div>
-                                        )}
-
-                                        {post.video_url && (
-                                            <div className="rounded-xl overflow-hidden border border-slate-100 mb-4 bg-slate-900">
-                                                <video src={post.video_url} controls className="w-full h-auto max-h-[500px] object-contain" />
-                                            </div>
-                                        )}
-
-                                        {post.likes_count > 0 && post.liked_by_users?.length > 0 && (
-                                            <div className="flex text-xs text-slate-500 mb-3 px-1">
-                                                <span className="font-bold mr-1 text-slate-700">{post.liked_by_users[0].name}</span>
-                                                {post.likes_count > 1 ? `and ${post.likes_count - 1} others liked this` : 'liked this'}
-                                            </div>
-                                        )}
-                                        <div className="flex items-center justify-between pt-4 border-t border-slate-100">
-                                            <div className="flex items-center gap-6">
-                                                <button onClick={() => likeMutation.mutate({ postId: post.id, isDislike: false })} className="flex items-center gap-1.5 text-slate-500 hover:text-rose-600 transition-colors group">
-                                                    <Heart className={`w-5 h-5 ${post.has_liked ? 'fill-rose-500 text-rose-500' : 'group-hover:scale-110 transition-transform'}`} />
-                                                    <span className="text-sm font-medium">{post.likes_count || 0}</span>
-                                                </button>
-                                                <button
-                                                    onClick={() => setExpandedPostId(expandedPostId === post.id ? null : post.id)}
-                                                    className={`flex items-center gap-1.5 transition-colors group ${expandedPostId === post.id ? 'text-violet-600' : 'text-slate-500 hover:text-violet-600'}`}
-                                                >
-                                                    <MessageSquare className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                                                    <span className="text-sm font-medium">{post.comments_count || 0}</span>
-                                                </button>
-                                            </div>
-                                            <button className="text-slate-400 hover:text-slate-600">
-                                                <Share2 className="w-5 h-5" />
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    {/* Comments Section */}
-                                    <AnimatePresence>
-                                        {expandedPostId === post.id && (
-                                            <motion.div
-                                                initial={{ height: 0, opacity: 0 }}
-                                                animate={{ height: 'auto', opacity: 1 }}
-                                                exit={{ height: 0, opacity: 0 }}
-                                                className="bg-slate-50/50 border-t border-slate-100"
-                                            >
-                                                <CommentSection postId={post.id} user={user} />
-                                            </motion.div>
-                                        )}
-                                    </AnimatePresence>
-                                </motion.div>
-                            ))}
-                        </div>
-                    )}
-
-                    {activeTab === 'requests' && (
-                        <div className="space-y-4">
-                            <h2 className="text-lg font-bold text-slate-900 px-1">Connection Requests</h2>
-                            {followRequests.length === 0 && (
-                                <div className="bg-white rounded-xl p-12 text-center border border-dashed border-slate-200">
-                                    <UserPlus className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-                                    <p className="text-slate-500 text-sm">No pending requests</p>
+                            {myPosts.length === 0 && (
+                                <div className="text-center py-20 bg-white rounded-2xl border border-slate-200">
+                                    <MessageSquare className="w-12 h-12 text-slate-200 mx-auto mb-4" />
+                                    <h3 className="text-lg font-bold text-slate-700">No Posts Yet</h3>
+                                    <p className="text-slate-500 text-sm mt-2">Start sharing your experiences and opportunities!</p>
                                 </div>
                             )}
-                            {followRequests.map(req => (
-                                <div key={req.follower_id} className="bg-white p-5 rounded-xl border border-slate-200 flex items-center justify-between shadow-sm">
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center font-bold text-lg">
-                                            {req.follower_name.charAt(0)}
-                                        </div>
-                                        <div>
-                                            <h4 className="font-bold text-slate-900">{req.follower_name}</h4>
-                                            <p className="text-xs text-slate-500">{req.follower_college}</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <button
-                                            onClick={() => updateFollowMutation.mutate({ followerId: req.follower_id, status: 'rejected' })}
-                                            className="p-2.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                                        >
-                                            <X className="w-5 h-5" />
-                                        </button>
-                                        <button
-                                            onClick={() => updateFollowMutation.mutate({ followerId: req.follower_id, status: 'accepted' })}
-                                            className="px-5 py-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold rounded-lg transition-all shadow-sm"
-                                        >
-                                            Accept
-                                        </button>
-                                    </div>
-                                </div>
+                            {myPosts.map((post) => (
+                                <PostItem key={post.id} post={post} user={user} />
                             ))}
                         </div>
                     )}
+
+
 
                     {activeTab === 'notifications' && (
                         <div className="space-y-4">
@@ -497,154 +399,6 @@ const AlumniDashboard = () => {
                     )}
                 </div>
 
-                {/* RIGHT SIDEBAR */}
-                <div className="col-span-12 lg:col-span-3 space-y-6">
-                    <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
-                        <div className="flex items-center gap-2 mb-6 text-slate-400 text-xs font-bold uppercase tracking-wider">
-                            <Award className="w-4 h-4" /> Your Progress
-                        </div>
-                        <div className="space-y-4">
-                            <div className="flex justify-between text-sm">
-                                <span className="font-medium text-slate-600">Profile Engagement</span>
-                                <span className="font-bold text-emerald-600">+12%</span>
-                            </div>
-                            <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                                <div className="bg-gradient-to-r from-violet-500 to-indigo-500 h-full rounded-full w-[75%]"></div>
-                            </div>
-                            <p className="text-xs text-slate-500 text-center pt-2">Keep posting to reach "Star Alumni" status</p>
-                        </div>
-                    </div>
-
-                    <div className="bg-gradient-to-br from-violet-600 to-indigo-700 rounded-2xl p-6 shadow-lg shadow-indigo-200 text-white">
-                        <div className="flex items-center justify-between mb-6">
-                            <span className="text-xs font-bold uppercase tracking-wider flex items-center gap-2">
-                                <Sparkles className="w-4 h-4" /> Campus Bulletin
-                            </span>
-                            <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
-                        </div>
-                        <BulletinWidget />
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-const BulletinWidget = () => {
-    const { user } = useUser();
-    const { data: events = [], isLoading } = useQuery({
-        queryKey: ['events'],
-        queryFn: async () => {
-            const { data } = await axios.get('/api/events', {
-                headers: { 'Authorization': `Bearer ${user.token}` }
-            });
-            return data;
-        }
-    });
-
-    if (isLoading) return <div className="h-20 flex items-center justify-center"><Loader2 className="animate-spin w-5 h-5 opacity-50" /></div>;
-
-    if (events.length === 0) return <p className="text-sm opacity-60 text-center py-4">No active notices.</p>;
-
-    return (
-        <div className="space-y-4">
-            {events.slice(0, 3).map(event => (
-                <div key={event.id} className="bg-white/10 backdrop-blur-sm rounded-xl p-3 border border-white/10 hover:bg-white/20 transition-colors cursor-pointer">
-                    <div className="flex justify-between items-start mb-1">
-                        <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${event.type === 'placement' ? 'bg-emerald-500/20 text-emerald-100' : 'bg-violet-500/20 text-violet-100'
-                            }`}>
-                            {event.type}
-                        </span>
-                        <span className="text-[10px] opacity-60">{new Date(event.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
-                    </div>
-                    <h4 className="font-bold text-sm leading-tight mb-1">{event.title}</h4>
-                    <p className="text-xs opacity-70 line-clamp-2">{event.description}</p>
-                </div>
-            ))}
-        </div>
-    );
-};
-
-const CommentSection = ({ postId, user }) => {
-    const queryClient = useQueryClient();
-    const [commentContent, setCommentContent] = useState('');
-
-    const { data: comments = [], isLoading } = useQuery({
-        queryKey: ['comments', postId],
-        queryFn: async () => {
-            const { data } = await axios.get(`/api/posts/${postId}/comments`, {
-                headers: { 'Authorization': `Bearer ${user.token}` }
-            });
-            return data;
-        }
-    });
-
-    const addCommentMutation = useMutation({
-        mutationFn: async (content) => axios.post(`/api/posts/${postId}/comment`, { content }, {
-            headers: { 'Authorization': `Bearer ${user.token}` }
-        }),
-        onSuccess: () => {
-            setCommentContent('');
-            queryClient.invalidateQueries(['comments', postId]);
-            queryClient.invalidateQueries(['myPosts']); // Update count
-        }
-    });
-
-    return (
-        <div className="p-5 space-y-4">
-            {isLoading ? (
-                <div className="flex justify-center p-4">
-                    <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
-                </div>
-            ) : (
-                <div className="space-y-3 max-h-[300px] overflow-y-auto modern-scrollbar">
-                    {comments.length === 0 && (
-                        <p className="text-center text-xs text-slate-400 italic py-2">No comments yet. Be the first!</p>
-                    )}
-                    {comments.map(c => (
-                        <div key={c.id} className="flex gap-3">
-                            <div className="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center text-xs font-bold text-slate-600 flex-shrink-0 overflow-hidden bg-cover bg-center" style={{ backgroundImage: c.user_profile_picture ? `url(${c.user_profile_picture})` : 'none' }}>
-                                {!c.user_profile_picture && (c.user_name ? c.user_name.charAt(0) : 'U')}
-                            </div>
-                            <div className="bg-slate-100/80 rounded-2xl rounded-tl-none px-4 py-2 text-sm">
-                                <p className="font-bold text-slate-900 text-xs mb-0.5">{c.user_name}</p>
-                                <p className="text-slate-700">{c.content}</p>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            )}
-
-            <div className="flex flex-col gap-3">
-                <div className="flex flex-wrap gap-2 mb-2">
-                    {['👍', '❤️', '👏', '🔥'].map(emoji => (
-                        <button key={emoji} onClick={() => setCommentContent(prev => prev + emoji)} className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors text-lg">
-                            {emoji}
-                        </button>
-                    ))}
-                    {['Congratulations!', 'Keep going!', 'Great job!', 'Amazing!'].map(text => (
-                        <button key={text} onClick={() => setCommentContent(prev => prev + (prev ? ' ' : '') + text)} className="px-3 py-1.5 bg-slate-100 hover:bg-violet-50 hover:text-violet-600 text-slate-600 rounded-full text-xs font-medium transition-colors">
-                            {text}
-                        </button>
-                    ))}
-                </div>
-                <div className="flex gap-2 relative">
-                    <input
-                        type="text"
-                        value={commentContent}
-                        onChange={(e) => setCommentContent(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && commentContent && addCommentMutation.mutate(commentContent)}
-                        placeholder="Write a comment..."
-                        className="flex-1 bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-violet-100 focus:border-violet-500 outline-none transition-all"
-                    />
-                    <button
-                        onClick={() => addCommentMutation.mutate(commentContent)}
-                        disabled={!commentContent || addCommentMutation.isPending}
-                        className="p-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl transition-all disabled:opacity-50 shadow-md shadow-violet-200"
-                    >
-                        <Send className="w-4 h-4" />
-                    </button>
-                </div>
             </div>
         </div>
     );
