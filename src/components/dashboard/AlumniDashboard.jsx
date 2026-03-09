@@ -290,7 +290,7 @@ const AlumniDashboard = () => {
                                             {(postData.image_url || postData.video_url) && (
                                                 <div className="mt-4 relative rounded-xl border border-slate-200 overflow-hidden bg-slate-50 group">
                                                     {postData.image_url && <img src={postData.image_url} alt="Attached" className="w-full h-auto max-h-[300px] object-cover" />}
-                                                    {postData.video_url && <span className="p-4 block font-medium">Video attached: {postData.video_url}</span>}
+                                                    {postData.video_url && <video src={postData.video_url} controls className="w-full h-auto max-h-[300px] object-contain bg-slate-900" />}
                                                     <button onClick={() => setPostData({ ...postData, image_url: '', video_url: '' })} className="absolute top-2 right-2 p-1.5 bg-white/80 hover:bg-rose-50 hover:text-rose-600 text-slate-700 rounded-lg shadow-sm backdrop-blur-md transition-colors">
                                                         <X className="w-4 h-4" />
                                                     </button>
@@ -375,6 +375,12 @@ const AlumniDashboard = () => {
                                         {post.image_url && (
                                             <div className="rounded-xl overflow-hidden border border-slate-100 mb-4 bg-slate-50">
                                                 <img src={post.image_url} alt="Post" className="w-full h-auto object-cover max-h-[500px]" />
+                                            </div>
+                                        )}
+
+                                        {post.video_url && (
+                                            <div className="rounded-xl overflow-hidden border border-slate-100 mb-4 bg-slate-900">
+                                                <video src={post.video_url} controls className="w-full h-auto max-h-[500px] object-contain" />
                                             </div>
                                         )}
 

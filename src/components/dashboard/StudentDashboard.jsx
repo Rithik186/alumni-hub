@@ -322,12 +322,8 @@ const StudentDashboard = () => {
                                         )}
 
                                         {post.video_url && (
-                                            <div className="rounded-[32px] overflow-hidden mb-8 border border-slate-100 bg-slate-900 aspect-video flex items-center justify-center relative group">
-                                                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-8">
-                                                    <p className="text-white text-[10px] font-black uppercase tracking-widest">Video Stream Broadcast</p>
-                                                </div>
-                                                <Video className="w-12 h-12 text-blue-500/20" />
-                                                <a href={post.video_url} target="_blank" rel="noopener noreferrer" className="absolute inset-0 z-10"></a>
+                                            <div className="rounded-[32px] overflow-hidden mb-8 border border-slate-100 bg-slate-900 flex items-center justify-center">
+                                                <video src={post.video_url} controls className="w-full h-auto max-h-[400px] object-contain outline-none" />
                                             </div>
                                         )}
 
