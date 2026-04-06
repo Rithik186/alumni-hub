@@ -238,16 +238,22 @@ const AlumniDashboard = () => {
             ]);
             return { requests: followRequestsRes.data, profile: profileRes.data };
         },
-        refetchInterval: 5000
+        staleTime: 30000, // 30s stale time
+        refetchInterval: 30000 // Only poll every 30s
+    });
+
+    // Dedicated unread count for the badge (much lighter than full list)
+    const { data: unreadCount = 0 } = useQuery({
+        queryKey: ['notifications', 'unread-count'],
+        queryFn: async () => (await axios.get('/api/notifications/unread-count', authHeader(user.token))).data.count,
+        refetchInterval: 10000, // Every 10s is enough for real-time feel
     });
 
     const { data: notifications = [] } = useQuery({
         queryKey: ['notifications'],
-        queryFn: async () => {
-            const { data } = await axios.get('/api/notifications', authHeader(user.token));
-            return data;
-        },
-        refetchInterval: 3000
+        queryFn: async () => (await axios.get('/api/notifications', authHeader(user.token))).data,
+        enabled: activeTab === 'notifications', // Only fetch when looking at notifications
+        staleTime: 60000,
     });
 
     const { data: stats = { followers: 0, following: 0 } } = useQuery({
@@ -284,7 +290,6 @@ const AlumniDashboard = () => {
 
     // ── Derived ──────────────────────────────────────────────────────────────
     const followRequests = dashboardData?.requests || [];
-    const unreadNotifications = notifications.filter(n => !n.is_read);
     const myPostsCount = useMemo(() => myPosts.filter(p => p.user_id === user.id).length, [myPosts, user.id]);
 
     const trendingTopics = useMemo(() => {
@@ -394,8 +399,8 @@ const AlumniDashboard = () => {
                                             }`}>
                                                 <item.icon className={`w-[18px] h-[18px] flex-shrink-0 ${isActive ? 'text-teal-600' : 'text-slate-400'}`} />
                                                 {item.label}
-                                                {item.id === 'notifications' && unreadNotifications.length > 0 && (
-                                                    <Badge variant="destructive" className="ml-auto text-[9px] px-1.5 py-0">{unreadNotifications.length}</Badge>
+                                                {item.id === 'notifications' && unreadCount > 0 && (
+                                                    <Badge variant="destructive" className="ml-auto text-[9px] px-1.5 py-0">{unreadCount}</Badge>
                                                 )}
                                                 {item.id === 'network' && followRequests.length > 0 && (
                                                     <Badge variant="warning" className="ml-auto text-[9px] px-1.5 py-0">{followRequests.length}</Badge>
@@ -519,8 +524,8 @@ const AlumniDashboard = () => {
                                 <div className="flex items-center justify-between px-1 mb-1">
                                     <p className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
                                         <Bell className="w-3.5 h-3.5 text-teal-600" /> Notifications
-                                        {unreadNotifications.length > 0 && (
-                                            <Badge variant="destructive" className="text-[9px] ml-1">{unreadNotifications.length} new</Badge>
+                                        {unreadCount > 0 && (
+                                            <Badge variant="destructive" className="text-[9px] ml-1">{unreadCount} new</Badge>
                                         )}
                                     </p>
                                     <Button variant="ghost" size="icon" onClick={() => setActiveTab('feed')} className="h-7 w-7">
@@ -731,8 +736,8 @@ const AlumniDashboard = () => {
                             <div className={`flex flex-col items-center gap-0.5 px-3 py-1 rounded-lg transition-all ${isActive ? 'text-teal-600' : 'text-slate-400'}`}>
                                 <item.icon className="w-5 h-5" />
                                 <span className="text-[10px] font-medium">{item.label}</span>
-                                {item.id === 'notifications' && unreadNotifications.length > 0 && (
-                                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-white text-[8px] font-bold rounded-full flex items-center justify-center">{unreadNotifications.length}</span>
+                                {item.id === 'notifications' && unreadCount > 0 && (
+                                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-white text-[8px] font-bold rounded-full flex items-center justify-center">{unreadCount > 9 ? '9+' : unreadCount}</span>
                                 )}
                             </div>
                         );

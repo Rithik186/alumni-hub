@@ -36,7 +36,8 @@ const AdminDashboard = () => {
                 events: events.data
             };
         },
-        refetchInterval: 5000
+        staleTime: 30000,
+        refetchInterval: 30000
     });
 
     const approvalMutation = useMutation({

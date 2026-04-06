@@ -35,24 +35,39 @@ export const createPost = async (req, res) => {
 
 export const getFeed = async (req, res) => {
     const userId = req.user.id;
+    const { page = 1, limit = 10 } = req.query;
+    const offset = (page - 1) * limit;
+
     try {
         const feed = await db.query(`
-            SELECT p.*, u.name as author_name, u.role as author_role, u.college as author_college, u.profile_picture as author_profile_picture,
-            (SELECT COUNT(*) FROM post_likes l WHERE l.post_id = p.id AND l.is_dislike = FALSE) as likes_count,
-            (SELECT COUNT(*) FROM post_likes l WHERE l.post_id = p.id AND l.is_dislike = TRUE) as dislikes_count,
-            (SELECT COUNT(*) FROM post_comments c WHERE c.post_id = p.id) as comments_count,
-            EXISTS(SELECT 1 FROM post_likes l WHERE l.post_id = p.id AND l.user_id = $1 AND l.is_dislike = FALSE) as has_liked,
-            (SELECT COALESCE(json_agg(json_build_object('name', lu.name)), '[]'::json) FROM post_likes pl JOIN users lu ON pl.user_id = lu.id WHERE pl.post_id = p.id AND pl.is_dislike = FALSE) as liked_by_users
-            FROM posts p
-            JOIN users u ON p.user_id = u.id
-            WHERE p.user_id = $1 
-            OR p.user_id IN (SELECT following_id FROM follows WHERE follower_id = $1 AND status = 'accepted')
-            OR u.college = (SELECT college FROM users WHERE id = $1)
-            ORDER BY p.created_at DESC
-        `, [userId]);
+            WITH feed_posts AS (
+                SELECT p.*, u.name as author_name, u.role as author_role, u.college as author_college, u.profile_picture as author_profile_picture
+                FROM posts p
+                JOIN users u ON p.user_id = u.id
+                WHERE p.user_id = $1 
+                OR p.user_id IN (SELECT following_id FROM follows WHERE follower_id = $1 AND status = 'accepted')
+                OR u.college = (SELECT college FROM users WHERE id = $1)
+                ORDER BY p.created_at DESC
+                LIMIT $2 OFFSET $3
+            )
+            SELECT 
+                fp.*,
+                (SELECT COUNT(*) FROM post_likes l WHERE l.post_id = fp.id AND l.is_dislike = FALSE) as likes_count,
+                (SELECT COUNT(*) FROM post_likes l WHERE l.post_id = fp.id AND l.is_dislike = TRUE) as dislikes_count,
+                (SELECT COUNT(*) FROM post_comments c WHERE c.post_id = fp.id) as comments_count,
+                EXISTS(SELECT 1 FROM post_likes l WHERE l.post_id = fp.id AND l.user_id = $1 AND l.is_dislike = FALSE) as has_liked,
+                (SELECT COALESCE(json_agg(json_build_object('name', lu.name)), '[]'::json) 
+                 FROM post_likes pl 
+                 JOIN users lu ON pl.user_id = lu.id 
+                 WHERE pl.post_id = fp.id AND pl.is_dislike = FALSE) as liked_by_users
+            FROM feed_posts fp
+            ORDER BY fp.created_at DESC
+        `, [userId, limit, offset]);
+
         res.json(feed.rows);
     } catch (err) {
-        res.status(500).json({ message: err.message });
+        console.error('Feed error:', err);
+        res.status(500).json({ message: 'Error loading feed' });
     }
 };
 

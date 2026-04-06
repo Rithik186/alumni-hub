@@ -17,7 +17,8 @@ const BulletinBoard = () => {
             });
             return data;
         },
-        refetchInterval: 5000 // Realtime 5s
+        staleTime: 60000,
+        refetchInterval: 60000 
     });
 
     if (isLoading) return (
