@@ -6,7 +6,8 @@ export const updateProfilePicture = async (req, res) => {
             return res.status(400).json({ message: 'No file uploaded' });
         }
 
-        const profile_picture_url = `/uploads/profile-pictures/${req.file.filename}`;
+        const base64String = req.file.buffer.toString('base64');
+        const profile_picture_url = `data:${req.file.mimetype};base64,${base64String}`;
 
         await db.query(
             'UPDATE users SET profile_picture = $1 WHERE id = $2',
@@ -31,7 +32,8 @@ export const uploadMedia = (req, res) => {
     // Determine if image or video based on mimetype or extension
     const isVideo = req.file.mimetype.startsWith('video/');
 
-    const mediaUrl = `/uploads/posts/${req.file.filename}`;
+    const base64String = req.file.buffer.toString('base64');
+    const mediaUrl = `data:${req.file.mimetype};base64,${base64String}`;
 
     res.json({
         url: mediaUrl,

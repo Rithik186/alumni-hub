@@ -6,11 +6,14 @@ export const updateProfile = async (req, res) => {
     const user_id = req.user.id;
 
     try {
+        // Ensure skills is an array if it's a string
+        const skillsArray = typeof skills === 'string' ? skills.split(',').map(s => s.trim()).filter(s => s) : skills;
+
         await db.query(
             `UPDATE alumni_profiles 
              SET company = $1, job_role = $2, skills = $3, bio = $4, mentorship_available = $5, experience_level = $6
              WHERE user_id = $7`,
-            [company, job_role, skills, bio, mentorship_available, experience_level, user_id]
+            [company, job_role, skillsArray, bio, mentorship_available, experience_level, user_id]
         );
         res.json({ message: 'Profile updated successfully' });
     } catch (error) {

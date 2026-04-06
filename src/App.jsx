@@ -9,9 +9,11 @@ import Login from './pages/Auth/Login';
 import Register from './pages/Auth/Register';
 import ForgotPassword from './pages/Auth/ForgotPassword';
 import Profile from './pages/Profile';
+import Settings from './pages/Settings';
 import Dashboard from './pages/Dashboard';
 import Chat from './pages/Chat';
 import Network from './pages/Network';
+import EditProfile from './pages/EditProfile';
 
 const LandingPage = () => (
   <>
@@ -44,6 +46,22 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Profile />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/profile/edit"
+              element={
+                <ProtectedRoute>
+                  <EditProfile />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/settings"
+              element={
+                <ProtectedRoute>
+                  <Settings />
                 </ProtectedRoute>
               }
             />

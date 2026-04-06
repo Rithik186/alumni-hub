@@ -42,17 +42,23 @@ const BulletinBoard = () => {
     );
 
     return (
-        <section className="space-y-12 pb-20">
-            <header className="flex flex-col md:flex-row md:items-end justify-between gap-8">
-                <div>
-                    <div className="flex items-center gap-3 mb-4">
-                        <div className="live-dot"></div>
-                        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-600">Active Broadcasts</span>
+        <section className="space-y-12 max-w-[1240px] mx-auto pb-24 relative z-10">
+            <header className="flex flex-col md:flex-row md:items-center justify-between gap-8 mb-16">
+                <div className="space-y-1">
+                    <div className="flex items-center gap-3">
+                        <span className="live-dot"></span>
+                        <span className="text-[10px] font-black uppercase tracking-[0.3em] text-indigo-500">Neural Network Active</span>
                     </div>
-                    <h3 className="text-4xl font-black text-slate-900 tracking-tighter">Campus <span className="text-blue-600">Bulletin</span></h3>
+                    <h2 className="text-5xl font-black text-slate-900 tracking-tighter leading-none">Global <span className="text-indigo-600">Bulletin</span></h2>
                 </div>
-                <div className="px-6 py-3 bg-white border border-slate-100 rounded-2xl shadow-sm text-[10px] font-black uppercase tracking-widest text-slate-500">
-                    Transmission Node: Alpha-7
+                <div className="flex items-center gap-4 bg-white/60 backdrop-blur-xl px-6 py-4 rounded-3xl border border-white/50 shadow-sm transition-all hover:shadow-xl group">
+                    <div className="p-3 bg-slate-900 text-white rounded-2xl group-hover:bg-indigo-600 transition-colors">
+                        <Target className="w-5 h-5" />
+                    </div>
+                    <div>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Transmission State</p>
+                        <p className="text-sm font-bold text-slate-900 leading-none">Sync: Alpha-7-Node</p>
+                    </div>
                 </div>
             </header>
 
@@ -61,49 +67,52 @@ const BulletinBoard = () => {
                     {events.map((event, i) => (
                         <motion.div
                             key={event.id}
-                            layout
-                            initial={{ opacity: 0, y: 30 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.9 }}
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
                             transition={{ delay: i * 0.1 }}
-                            className="premium-card p-10 flex flex-col group relative overflow-hidden"
+                            className="workspace-card p-10 flex flex-col group relative"
                         >
-                            <div className="absolute top-0 right-0 p-10 opacity-[0.03] group-hover:scale-150 transition-transform duration-1000 rotate-12 pointer-events-none">
-                                <Megaphone className="w-32 h-32" />
+                            <div className="absolute -top-12 -right-12 p-10 opacity-[0.03] group-hover:opacity-[0.06] transition-all duration-700 rotate-[15deg] pointer-events-none scale-150">
+                                <Megaphone className="w-48 h-48" />
                             </div>
 
-                            <div className="flex justify-between items-start mb-10">
-                                <div className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-[0.1em] border shadow-sm transition-all duration-500 ${event.type === 'placement' ? 'bg-orange-50 text-orange-600 border-orange-100' :
+                            <div className="flex justify-between items-start mb-10 relative z-10">
+                                <div className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-[0.1em] border shadow-sm transition-all duration-500 ${
+                                    event.type === 'placement' ? 'bg-amber-50 text-amber-600 border-amber-100' :
                                     event.type === 'training' ? 'bg-indigo-50 text-indigo-600 border-indigo-100' :
-                                        'bg-slate-50 text-slate-600 border-slate-100'
-                                    }`}>
+                                    'bg-slate-50 text-slate-600 border-slate-100'
+                                }`}>
                                     {event.type.replace('_', ' ')}
                                 </div>
-                                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                                    <Clock className="w-3.5 h-3.5" /> Just Synced
+                                <div className="p-2 bg-slate-50 text-slate-300 rounded-xl group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">
+                                    <ArrowUpRight className="w-5 h-5" />
                                 </div>
                             </div>
 
-                            <div className="flex-1">
-                                <h4 className="text-2xl font-black text-slate-900 mb-4 tracking-tighter leading-tight group-hover:text-blue-600 transition-colors">
+                            <div className="flex-1 relative z-10">
+                                <h3 className="text-2xl font-black text-slate-900 mb-4 tracking-tighter leading-tight group-hover:text-indigo-600 transition-colors uppercase">
                                     {event.title}
-                                </h4>
-                                <p className="text-slate-500 font-medium leading-relaxed mb-10 line-clamp-3">
+                                </h3>
+                                <p className="text-slate-500 font-medium leading-relaxed mb-10 line-clamp-3 text-sm">
                                     {event.description}
                                 </p>
                             </div>
 
-                            <div className="mt-auto pt-8 border-t border-slate-50 flex items-center justify-between">
+                            <div className="mt-auto pt-8 border-t border-slate-100/60 flex items-center justify-between relative z-10">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center border border-slate-100">
-                                        <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                                    <div className="w-10 h-10 rounded-2xl bg-slate-50 flex items-center justify-center border border-slate-100 group-hover:bg-white group-hover:shadow-md transition-all">
+                                        <Calendar className="w-4 h-4 text-slate-400 group-hover:text-indigo-600 transition-colors" />
                                     </div>
-                                    <span className="text-[10px] font-black text-slate-800 uppercase tracking-widest">
-                                        {new Date(event.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                                    </span>
+                                    <div className="space-y-0.5">
+                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none">Event Cycle</p>
+                                        <p className="text-[11px] font-black text-slate-800 tracking-tight leading-none">
+                                            {new Date(event.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                                        </p>
+                                    </div>
                                 </div>
-                                <button className="w-10 h-10 bg-slate-900 text-white rounded-xl flex items-center justify-center hover:bg-blue-600 hover:scale-110 active:scale-95 transition-all shadow-xl shadow-slate-100 group-hover:shadow-blue-100">
-                                    <ArrowUpRight className="w-5 h-5" />
+                                <button className="px-6 py-3 bg-slate-900 border border-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-[0.15em] hover:bg-indigo-600 hover:border-indigo-600 transition-all shadow-xl shadow-slate-100 group-hover:shadow-indigo-100">
+                                    Detail Sync
                                 </button>
                             </div>
                         </motion.div>

@@ -1,174 +1,215 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Loader2, Heart, Pin, Reply, MoreVertical } from 'lucide-react';
+import { Loader2, Heart, Pin, Reply, Send, X, Smile } from 'lucide-react';
 import axios from 'axios';
+
+const QUICK_REPLIES = [
+    'Congratulations! 🎉',
+    'Great job! 👏',
+    'Good work! 💪',
+    'Well done! 🌟',
+    'Amazing! 🔥',
+    'Thanks for sharing! 🙌',
+];
 
 const CommentSection = ({ postId, postOwnerId, user }) => {
     const queryClient = useQueryClient();
-    const [commentContent, setCommentContent] = useState('');
-    const [replyingTo, setReplyingTo] = useState(null);
-    const [sortBy, setSortBy] = useState('recent'); // recent, relevant
+    const [text, setText] = useState('');
+    const [replyTo, setReplyTo] = useState(null);
 
     const { data: comments = [], isLoading } = useQuery({
         queryKey: ['comments', postId],
         queryFn: async () => {
             const { data } = await axios.get(`/api/posts/${postId}/comments`, {
-                headers: { 'Authorization': `Bearer ${user.token}` }
+                headers: { Authorization: `Bearer ${user.token}` }
             });
-            return data;
-        }
+            return Array.isArray(data) ? data : [];
+        },
+        staleTime: 30000,
     });
 
-    const addCommentMutation = useMutation({
-        mutationFn: async (contentData) => axios.post(`/api/posts/${postId}/comment`, contentData, {
-            headers: { 'Authorization': `Bearer ${user.token}` }
-        }),
+    const addMutation = useMutation({
+        mutationFn: (content) => axios.post(`/api/posts/${postId}/comment`,
+            { content, parentId: replyTo?.id || null },
+            { headers: { Authorization: `Bearer ${user.token}` } }
+        ),
         onSuccess: () => {
-            setCommentContent('');
-            setReplyingTo(null);
+            setText('');
+            setReplyTo(null);
             queryClient.invalidateQueries(['comments', postId]);
             queryClient.invalidateQueries(['feed']);
         }
     });
 
-    const likeCommentMutation = useMutation({
-        mutationFn: async (commentId) => axios.post(`/api/posts/comment/${commentId}/like`, {}, {
-            headers: { 'Authorization': `Bearer ${user.token}` }
+    const likeMutation = useMutation({
+        mutationFn: (cId) => axios.post(`/api/posts/comment/${cId}/like`, {}, {
+            headers: { Authorization: `Bearer ${user.token}` }
         }),
         onSuccess: () => queryClient.invalidateQueries(['comments', postId])
     });
 
-    const pinCommentMutation = useMutation({
-        mutationFn: async (commentId) => axios.post(`/api/posts/comment/${commentId}/pin`, {}, {
-            headers: { 'Authorization': `Bearer ${user.token}` }
+    const pinMutation = useMutation({
+        mutationFn: (cId) => axios.post(`/api/posts/comment/${cId}/pin`, {}, {
+            headers: { Authorization: `Bearer ${user.token}` }
         }),
         onSuccess: () => queryClient.invalidateQueries(['comments', postId])
     });
 
     const handleSubmit = () => {
-        if (!commentContent.trim()) return;
-        addCommentMutation.mutate({ content: commentContent, parentId: replyingTo?.id || null });
+        if (!text.trim() || addMutation.isPending) return;
+        addMutation.mutate(text.trim());
     };
 
-    let displayComments = [...comments];
-    if (sortBy === 'recent') {
-        displayComments.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-    } else if (sortBy === 'relevant') {
-        displayComments.sort((a, b) => b.likes_count - a.likes_count);
-    }
-    // Always keep pinned at top
-    displayComments.sort((a, b) => (b.is_pinned ? 1 : 0) - (a.is_pinned ? 1 : 0));
+    const handleQuickReply = (msg) => {
+        if (addMutation.isPending) return;
+        addMutation.mutate(msg);
+    };
 
-    // Group replies
-    const topLevelComments = displayComments.filter(c => !c.parent_id);
-    const replies = displayComments.filter(c => c.parent_id);
+    const topLevel = [...comments]
+        .filter(c => !c.parent_id)
+        .sort((a, b) => (b.is_pinned ? 1 : 0) - (a.is_pinned ? 1 : 0));
+    const replies = comments.filter(c => c.parent_id);
+
+    if (isLoading) return (
+        <div className="flex items-center justify-center py-8 gap-2">
+            <Loader2 className="w-4 h-4 animate-spin text-indigo-400" />
+            <span className="text-xs text-slate-400 font-medium">Loading comments...</span>
+        </div>
+    );
 
     return (
-        <div className="space-y-6">
-            <div className="flex items-center justify-between px-2">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Comments</span>
-                <select
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value)}
-                    className="text-[10px] font-bold text-slate-500 uppercase tracking-widest bg-transparent outline-none cursor-pointer"
-                >
-                    <option value="recent">Most Recent</option>
-                    <option value="relevant">Most Relevant</option>
-                </select>
+        <div className="mt-4 pt-4 border-t border-slate-100 space-y-4">
+            {/* Quick Reply Chips */}
+            <div className="space-y-2">
+                <div className="flex items-center gap-1.5 text-slate-400">
+                    <Smile className="w-3.5 h-3.5" />
+                    <span className="text-[11px] font-semibold">Quick Reply</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                    {QUICK_REPLIES.map(msg => (
+                        <button
+                            key={msg}
+                            onClick={() => handleQuickReply(msg)}
+                            disabled={addMutation.isPending}
+                            className="px-3 py-1.5 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-300 rounded-full text-xs font-medium text-slate-600 hover:text-indigo-700 transition-all active:scale-95 disabled:opacity-50 whitespace-nowrap"
+                        >
+                            {msg}
+                        </button>
+                    ))}
+                </div>
             </div>
 
-            {isLoading ? (
-                <div className="flex justify-center p-4">
-                    <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
+            {/* Comment Input */}
+            <div className="space-y-2">
+                {replyTo && (
+                    <div className="flex items-center justify-between text-xs font-semibold text-indigo-600 bg-indigo-50 rounded-xl px-3 py-2">
+                        <span className="flex items-center gap-1.5">
+                            <Reply className="w-3 h-3" /> Replying to {replyTo.name}
+                        </span>
+                        <button onClick={() => setReplyTo(null)} className="hover:bg-indigo-100 rounded p-0.5 transition-colors">
+                            <X className="w-3.5 h-3.5" />
+                        </button>
+                    </div>
+                )}
+                <div className="flex gap-2 items-end">
+                    <div
+                        className="w-8 h-8 rounded-xl flex-shrink-0 bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-500 overflow-hidden bg-cover bg-center border border-slate-200/60"
+                        style={{ backgroundImage: user.profile_picture ? `url(${user.profile_picture})` : 'none' }}
+                    >
+                        {!user.profile_picture && user.name?.charAt(0)}
+                    </div>
+                    <div className="flex-1 flex gap-2">
+                        <input
+                            type="text"
+                            value={text}
+                            onChange={e => setText(e.target.value)}
+                            onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+                            placeholder={replyTo ? 'Write a reply...' : 'Write a comment...'}
+                            className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-sm text-slate-800 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-indigo-500/15 focus:border-indigo-300 focus:bg-white transition-all"
+                        />
+                        <button
+                            onClick={handleSubmit}
+                            disabled={!text.trim() || addMutation.isPending}
+                            className="px-3.5 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
+                        >
+                            {addMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                        </button>
+                    </div>
                 </div>
+            </div>
+
+            {/* Comments List */}
+            {topLevel.length === 0 ? (
+                <p className="text-center text-xs text-slate-400 py-4">No comments yet. Be the first to share your thoughts!</p>
             ) : (
-                <div className="space-y-4 max-h-[300px] overflow-y-auto modern-scrollbar pr-2">
-                    {topLevelComments.length === 0 && (
-                        <p className="text-center text-[10px] font-black uppercase tracking-widest text-slate-300 italic py-2">Start the conversation</p>
-                    )}
-                    {topLevelComments.map(c => (
-                        <div key={c.id} className="group">
-                            <div className="flex gap-4">
-                                <div className="w-8 h-8 bg-slate-100 rounded-xl flex items-center justify-center text-[10px] font-black text-slate-500 uppercase flex-shrink-0 bg-cover bg-center" style={{ backgroundImage: c.user_profile_picture ? `url(${c.user_profile_picture})` : 'none' }}>
-                                    {!c.user_profile_picture && (c.user_name ? c.user_name.charAt(0) : 'U')}
+                <div className="space-y-3 max-h-80 overflow-y-auto modern-scrollbar pr-1">
+                    {topLevel.map(c => (
+                        <div key={c.id}>
+                            <div className="flex gap-2.5">
+                                <div
+                                    className="w-8 h-8 rounded-xl flex-shrink-0 bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-500 overflow-hidden bg-cover bg-center border border-slate-200/60"
+                                    style={{ backgroundImage: c.user_profile_picture ? `url(${c.user_profile_picture})` : 'none' }}
+                                >
+                                    {!c.user_profile_picture && c.user_name?.charAt(0)}
                                 </div>
-                                <div className="flex-1">
-                                    <div className="bg-slate-50 rounded-2xl rounded-tl-none px-5 py-3 text-sm flex-1 group-hover:bg-white group-hover:shadow-lg transition-all border border-transparent group-hover:border-blue-50 relative">
-                                        {c.is_pinned && <div className="absolute top-2 right-2 text-blue-600"><Pin className="w-3 h-3" /></div>}
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <p className="font-bold text-slate-900 text-xs">{c.user_name}</p>
-                                            {c.user_role && <span className="text-[9px] bg-slate-200 text-slate-600 px-1.5 rounded">{c.user_role}</span>}
-                                        </div>
-                                        <p className="text-slate-600 leading-relaxed font-medium">{c.content}</p>
+                                <div className="flex-1 min-w-0">
+                                    <div className="bg-slate-50 rounded-2xl rounded-tl-sm px-3.5 py-2.5 relative group">
+                                        {c.is_pinned && (
+                                            <div className="absolute top-2 right-2 bg-amber-50 rounded-md p-0.5">
+                                                <Pin className="w-2.5 h-2.5 text-amber-500" />
+                                            </div>
+                                        )}
+                                        <p className="text-xs font-semibold text-slate-900 mb-0.5">
+                                            {c.user_name}
+                                            {c.user_role && <span className="font-normal text-slate-400 ml-1.5 text-[10px] capitalize">{c.user_role}</span>}
+                                        </p>
+                                        <p className="text-[13px] text-slate-700 leading-relaxed">{c.content}</p>
                                     </div>
-                                    <div className="flex items-center gap-4 mt-2 px-2 text-[10px] font-bold text-slate-400">
-                                        <button onClick={() => likeCommentMutation.mutate(c.id)} className={`flex items-center gap-1 hover:text-blue-600 transition-colors ${c.has_liked ? 'text-blue-600' : ''}`}>
-                                            <Heart className={`w-3 h-3 ${c.has_liked ? 'fill-blue-600' : ''}`} /> {c.likes_count || 0}
+                                    <div className="flex items-center gap-3.5 mt-1 px-1">
+                                        <button
+                                            onClick={() => likeMutation.mutate(c.id)}
+                                            className={`flex items-center gap-1 text-[11px] font-semibold transition-colors ${c.has_liked ? 'text-rose-500' : 'text-slate-400 hover:text-rose-500'}`}
+                                        >
+                                            <Heart className={`w-3 h-3 ${c.has_liked ? 'fill-rose-500' : ''}`} />
+                                            {c.likes_count || 0}
                                         </button>
-                                        <button onClick={() => setReplyingTo({ id: c.id, name: c.user_name })} className="flex items-center gap-1 hover:text-slate-600 transition-colors">
+                                        <button
+                                            onClick={() => setReplyTo({ id: c.id, name: c.user_name })}
+                                            className="flex items-center gap-1 text-[11px] font-semibold text-slate-400 hover:text-indigo-600 transition-colors"
+                                        >
                                             <Reply className="w-3 h-3" /> Reply
                                         </button>
                                         {user.id === postOwnerId && (
-                                            <button onClick={() => pinCommentMutation.mutate(c.id)} className="hover:text-amber-500 transition-colors">
+                                            <button
+                                                onClick={() => pinMutation.mutate(c.id)}
+                                                className={`text-[11px] font-semibold transition-colors ${c.is_pinned ? 'text-amber-500' : 'text-slate-400 hover:text-amber-500'}`}
+                                            >
                                                 {c.is_pinned ? 'Unpin' : 'Pin'}
                                             </button>
                                         )}
                                     </div>
+                                    {/* Nested Replies */}
+                                    {replies.filter(r => r.parent_id === c.id).map(r => (
+                                        <div key={r.id} className="flex gap-2 mt-2 ml-2">
+                                            <div
+                                                className="w-6 h-6 rounded-lg flex-shrink-0 bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-500 overflow-hidden bg-cover bg-center"
+                                                style={{ backgroundImage: r.user_profile_picture ? `url(${r.user_profile_picture})` : 'none' }}
+                                            >
+                                                {!r.user_profile_picture && r.user_name?.charAt(0)}
+                                            </div>
+                                            <div className="flex-1 bg-slate-50/80 rounded-xl rounded-tl-sm px-3 py-2">
+                                                <p className="text-[11px] font-semibold text-slate-900 mb-0.5">{r.user_name}</p>
+                                                <p className="text-xs text-slate-600 leading-relaxed">{r.content}</p>
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
-
-                            {/* Replies */}
-                            {replies.filter(r => r.parent_id === c.id).map(r => (
-                                <div key={r.id} className="flex gap-4 mt-3 ml-12">
-                                    <div className="w-6 h-6 bg-slate-100 rounded-lg flex items-center justify-center text-[8px] font-black text-slate-500 uppercase flex-shrink-0 bg-cover bg-center" style={{ backgroundImage: r.user_profile_picture ? `url(${r.user_profile_picture})` : 'none' }}>
-                                        {!r.user_profile_picture && (r.user_name ? r.user_name.charAt(0) : 'U')}
-                                    </div>
-                                    <div className="flex-1">
-                                        <div className="bg-slate-50/50 rounded-xl rounded-tl-none px-4 py-2 text-xs border border-transparent">
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <p className="font-bold text-slate-900 text-[10px]">{r.user_name}</p>
-                                            </div>
-                                            <p className="text-slate-600 font-medium">{r.content}</p>
-                                        </div>
-                                        <div className="flex items-center gap-4 mt-1 px-2 text-[9px] font-bold text-slate-400">
-                                            <button onClick={() => likeCommentMutation.mutate(r.id)} className={`flex items-center gap-1 hover:text-blue-600 transition-colors ${r.has_liked ? 'text-blue-600' : ''}`}>
-                                                <Heart className={`w-3 h-3 ${r.has_liked ? 'fill-blue-600' : ''}`} /> {r.likes_count || 0}
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
                         </div>
                     ))}
-                </div >
-            )}
-
-            <div className="flex flex-col gap-3">
-                {replyingTo && (
-                    <div className="flex items-center justify-between px-3 py-2 bg-blue-50 text-blue-700 text-[10px] font-bold uppercase tracking-widest rounded-xl">
-                        <span>Replying to {replyingTo.name}</span>
-                        <button onClick={() => setReplyingTo(null)} className="hover:text-blue-900">Cancel</button>
-                    </div>
-                )}
-                <div className="flex items-center gap-2">
-                    <input
-                        type="text"
-                        value={commentContent}
-                        onChange={(e) => setCommentContent(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
-                        placeholder={replyingTo ? 'Write a reply...' : 'Add to the discussion...'}
-                        className="flex-1 bg-slate-50 border-none rounded-xl px-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-700"
-                    />
-                    <button
-                        onClick={handleSubmit}
-                        disabled={!commentContent.trim() || addCommentMutation.isPending}
-                        className="px-6 py-3 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest disabled:opacity-50 hover:bg-blue-700 transition-colors shadow-lg shadow-blue-200"
-                    >
-                        Send
-                    </button>
                 </div>
-            </div>
-        </div >
+            )}
+        </div>
     );
 };
 

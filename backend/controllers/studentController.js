@@ -70,7 +70,7 @@ export const searchAlumni = async (req, res) => {
 
         // Skills filter (array overlap)
         if (skills) {
-            const skillsArray = skills.split(',').map(s => s.trim());
+            const skillsArray = typeof skills === 'string' ? skills.split(',').map(s => s.trim()) : skills;
             query += ` AND ap.skills && $${paramCount}::text[]`;
             params.push(skillsArray);
             paramCount++;
@@ -108,7 +108,8 @@ export const uploadResume = async (req, res) => {
             return res.status(400).json({ message: 'No file uploaded' });
         }
 
-        const resume_url = req.file.filename;
+        const base64String = req.file.buffer.toString('base64');
+        const resume_url = `data:${req.file.mimetype};base64,${base64String}`;
 
         await db.query(
             'UPDATE student_profiles SET resume_url = $1 WHERE user_id = $2',
@@ -122,6 +123,27 @@ export const uploadResume = async (req, res) => {
 
     } catch (error) {
         console.error('Resume Upload Error:', error);
-        res.status(500).json({ message: 'Server error during resume upload' });
+        res.status(500).json({ 
+            message: 'Server error during resume upload',
+            error: error.message 
+        });
+    }
+};
+
+// Update student profile
+export const updateProfile = async (req, res) => {
+    const { department, batch, bio, skills } = req.body;
+    try {
+        // Ensure skills is an array
+        const skillsArray = typeof skills === 'string' ? skills.split(',').map(s => s.trim()).filter(s => s) : skills;
+
+        await db.query(
+            'UPDATE student_profiles SET department = $1, batch = $2, bio = $3, skills = $4 WHERE user_id = $5',
+            [department, batch, bio, skillsArray, req.user.id]
+        );
+        res.json({ message: 'Profile updated successfully' });
+    } catch (error) {
+        console.error('Update Profile Error:', error);
+        res.status(500).json({ message: 'Server error updating profile' });
     }
 };

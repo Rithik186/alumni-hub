@@ -269,3 +269,20 @@ export const resetPassword = async (req, res) => {
         res.status(500).json({ message: 'Server error during password reset' });
     }
 };
+
+// @desc    Update user basic info
+// @route   PUT /api/auth/profile
+// @access  Private
+export const updateUser = async (req, res) => {
+    const { name, email, phone_number, college } = req.body;
+    try {
+        await db.query(
+            'UPDATE users SET name = $1, email = $2, phone_number = $3, college = $4 WHERE id = $5',
+            [name, email, phone_number, college, req.user.id]
+        );
+        res.json({ message: 'User info updated successfully' });
+    } catch (error) {
+        console.error('Update User Error:', error);
+        res.status(500).json({ message: 'Server error updating user info' });
+    }
+};

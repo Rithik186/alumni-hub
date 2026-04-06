@@ -1,26 +1,30 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
 import {
-    Menu, X, User, LogOut, LayoutDashboard,
+    User, LogOut, LayoutDashboard,
     Settings, Bell, Zap, ChevronDown,
-    ShieldCheck, Star, Activity
+    Activity, Menu, X
 } from 'lucide-react';
 import { useUser } from '../../context/UserContext';
 
 export const Navbar = () => {
     const { user, logout } = useUser();
-    const [isScrolled, setIsScrolled] = useState(false);
-    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [isProfileOpen, setIsProfileOpen] = useState(false);
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const navigate = useNavigate();
     const location = useLocation();
+    const dropdownRef = useRef(null);
 
+    // Close dropdown on outside click
     useEffect(() => {
-        const handleScroll = () => setIsScrolled(window.scrollY > 20);
-        window.addEventListener('scroll', handleScroll);
-        return () => window.removeEventListener('scroll', handleScroll);
-    }, []);
+        const handleClick = (e) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+                setIsProfileOpen(false);
+            }
+        };
+        if (isProfileOpen) document.addEventListener('mousedown', handleClick);
+        return () => document.removeEventListener('mousedown', handleClick);
+    }, [isProfileOpen]);
 
     const handleLogout = () => {
         logout();
@@ -33,152 +37,130 @@ export const Navbar = () => {
     ];
 
     return (
-        <nav className={`fixed top-0 left-0 right-0 z-[150] transition-all duration-700 ${isScrolled
-            ? 'py-4 bg-white/80 backdrop-blur-2xl shadow-[0_8px_32px_rgba(0,0,0,0.04)] border-b border-slate-100'
-            : 'py-8 bg-transparent'
-            }`}>
-            <div className="max-w-7xl mx-auto px-6 lg:px-12">
-                <div className="flex items-center justify-between">
-                    {/* Logo */}
-                    <Link to="/" className="group flex items-center gap-3">
-                        <div className="w-12 h-12 bg-slate-900 rounded-[18px] flex items-center justify-center text-white group-hover:bg-blue-600 transition-all duration-500 shadow-xl shadow-slate-200 group-hover:shadow-blue-100 group-hover:rotate-12">
-                            <Zap className="w-6 h-6 fill-current" />
-                        </div>
-                        <div className="flex flex-col">
-                            <span className="text-xl font-[900] tracking-tighter text-slate-900 leading-none">ALUMNI</span>
-                            <span className="text-[10px] font-black tracking-[0.3em] text-blue-600 leading-none mt-1">HUB</span>
+        <>
+            <nav className="fixed top-0 left-0 right-0 z-[150] h-14 bg-white border-b border-slate-200 shadow-sm">
+                <div className="w-full h-full px-4 lg:px-5 flex items-center justify-between">
+                    {/* Logo — icon only, no text */}
+                    <Link to="/" className="flex items-center gap-2 group">
+                        <div className="w-9 h-9 bg-slate-900 rounded-xl flex items-center justify-center text-white group-hover:bg-indigo-600 transition-colors shadow-sm">
+                            <Zap className="w-4.5 h-4.5 fill-current" />
                         </div>
                     </Link>
 
                     {/* Desktop Navigation */}
-                    <div className="hidden md:flex items-center gap-10">
-                        <div className="flex items-center gap-2 bg-slate-100/50 p-1.5 rounded-2xl border border-slate-200/50">
+                    <div className="hidden md:flex items-center gap-3">
+                        {/* Nav Links */}
+                        <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-lg border border-slate-100">
                             {navLinks.map((link) => (
                                 <Link
                                     key={link.path}
                                     to={link.path}
-                                    className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all duration-300 ${location.pathname === link.path
-                                        ? 'bg-white text-slate-900 shadow-sm'
-                                        : 'text-slate-500 hover:text-slate-800'
-                                        }`}
+                                    className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-[12px] font-semibold transition-all ${
+                                        location.pathname === link.path
+                                            ? 'bg-white text-slate-900 shadow-sm border border-slate-200'
+                                            : 'text-slate-500 hover:text-slate-800'
+                                    }`}
                                 >
-                                    <link.icon className={`w-3.5 h-3.5 ${location.pathname === link.path ? 'text-blue-600' : ''}`} />
+                                    <link.icon className={`w-3.5 h-3.5 ${location.pathname === link.path ? 'text-indigo-500' : ''}`} />
                                     {link.name}
                                 </Link>
                             ))}
                         </div>
 
                         {user ? (
-                            <div className="relative">
+                            <div className="relative" ref={dropdownRef}>
                                 <button
-                                    onClick={() => setIsProfileOpen(!isProfileOpen)}
-                                    className="flex items-center gap-3 p-1.5 pr-5 bg-white border border-slate-200 rounded-2xl hover:border-blue-300 transition-all duration-300 group shadow-sm active:scale-95"
+                                    onClick={() => setIsProfileOpen(p => !p)}
+                                    className="flex items-center gap-2.5 py-1 pl-1 pr-3 bg-white border border-slate-200 rounded-xl hover:border-indigo-300 transition-all group"
                                 >
-                                    <div className="w-10 h-10 bg-slate-100 rounded-[14px] flex items-center justify-center text-slate-900 font-black group-hover:bg-blue-600 group-hover:text-white transition-all">
-                                        {user.name.charAt(0)}
+                                    <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center text-slate-800 text-xs font-bold group-hover:bg-indigo-600 group-hover:text-white transition-all overflow-hidden bg-cover bg-center"
+                                        style={{ backgroundImage: user.profile_picture ? `url(${user.profile_picture})` : 'none' }}
+                                    >
+                                        {!user.profile_picture && user.name?.charAt(0)}
                                     </div>
-                                    <div className="text-left">
-                                        <p className="text-[11px] font-black text-slate-900 uppercase tracking-tighter">{user.name.split(' ')[0]}</p>
-                                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{user.role}</p>
+                                    <div className="text-left hidden lg:block">
+                                        <p className="text-[11px] font-semibold text-slate-900 leading-none">{user.name?.split(' ')[0]}</p>
+                                        <p className="text-[9px] font-medium text-slate-400 capitalize mt-0.5">{user.role}</p>
                                     </div>
-                                    <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-500 ${isProfileOpen ? 'rotate-180' : ''}`} />
+                                    <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${isProfileOpen ? 'rotate-180' : ''}`} />
                                 </button>
 
-                                <AnimatePresence>
-                                    {isProfileOpen && (
-                                        <>
-                                            <motion.div
-                                                initial={{ opacity: 0 }}
-                                                animate={{ opacity: 1 }}
-                                                exit={{ opacity: 0 }}
-                                                className="fixed inset-0 z-0"
-                                                onClick={() => setIsProfileOpen(false)}
-                                            />
-                                            <motion.div
-                                                initial={{ opacity: 0, scale: 0.95, y: 15 }}
-                                                animate={{ opacity: 1, scale: 1, y: 0 }}
-                                                exit={{ opacity: 0, scale: 0.95, y: 15 }}
-                                                className="absolute right-0 mt-4 w-72 bg-white rounded-[32px] shadow-2xl border border-slate-100 py-4 z-10 overflow-hidden"
-                                            >
-                                                <div className="px-8 py-6 border-b border-slate-50 mb-4 bg-slate-50/50">
-                                                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Authenticated As</p>
-                                                    <p className="text-sm font-black text-slate-900 truncate">{user.email}</p>
-                                                </div>
-                                                <div className="px-4 space-y-1">
-                                                    <button onClick={() => { navigate('/profile'); setIsProfileOpen(false); }} className="w-full flex items-center gap-4 px-6 py-4 rounded-2xl text-xs font-black text-slate-600 hover:bg-slate-50 hover:text-blue-600 transition-all group">
-                                                        <User className="w-4 h-4 text-slate-400 group-hover:text-blue-600" /> My Profile
-                                                    </button>
-                                                    <button onClick={() => { navigate('/dashboard'); setIsProfileOpen(false); }} className="w-full flex items-center gap-4 px-6 py-4 rounded-2xl text-xs font-black text-slate-600 hover:bg-slate-50 hover:text-blue-600 transition-all group">
-                                                        <Activity className="w-4 h-4 text-slate-400 group-hover:text-blue-600" /> Realtime Feed
-                                                    </button>
-                                                    <button onClick={() => { navigate('/settings'); setIsProfileOpen(false); }} className="w-full flex items-center gap-4 px-6 py-4 rounded-2xl text-xs font-black text-slate-600 hover:bg-slate-50 hover:text-blue-600 transition-all group">
-                                                        <Settings className="w-4 h-4 text-slate-400 group-hover:text-blue-600" /> Account Nodes
-                                                    </button>
-                                                </div>
-                                                <div className="mt-4 px-4 pt-4 border-t border-slate-50">
-                                                    <button onClick={handleLogout} className="w-full flex items-center gap-4 px-6 py-5 rounded-[22px] text-xs font-black text-red-500 hover:bg-red-50 transition-all">
-                                                        <LogOut className="w-4 h-4" /> Terminate Session
-                                                    </button>
-                                                </div>
-                                            </motion.div>
-                                        </>
-                                    )}
-                                </AnimatePresence>
+                                {/* Dropdown — no animation, instant show/hide */}
+                                {isProfileOpen && (
+                                    <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg border border-slate-200 py-2 z-50">
+                                        <div className="px-4 py-3 border-b border-slate-100 mb-1">
+                                            <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Signed in as</p>
+                                            <p className="text-sm font-semibold text-slate-900 truncate mt-0.5">{user.email}</p>
+                                        </div>
+                                        <div className="px-1.5 space-y-0.5">
+                                            <button onClick={() => { navigate('/profile'); setIsProfileOpen(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-indigo-600 transition-all">
+                                                <User className="w-4 h-4 text-slate-400" /> My Profile
+                                            </button>
+                                            <button onClick={() => { navigate('/dashboard'); setIsProfileOpen(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-indigo-600 transition-all">
+                                                <Activity className="w-4 h-4 text-slate-400" /> Dashboard
+                                            </button>
+                                            <button onClick={() => { navigate('/settings'); setIsProfileOpen(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-indigo-600 transition-all">
+                                                <Settings className="w-4 h-4 text-slate-400" /> Settings
+                                            </button>
+                                        </div>
+                                        <div className="mt-1 pt-1 border-t border-slate-100 px-1.5">
+                                            <button onClick={handleLogout} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-red-500 hover:bg-red-50 transition-all">
+                                                <LogOut className="w-4 h-4" /> Sign Out
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         ) : (
-                            <Link to="/login" className="btn-accent px-8 py-3 rounded-2xl text-xs font-black uppercase tracking-[0.2em] shadow-blue-100">
-                                Launch Hub <Activity className="w-4 h-4" />
+                            <Link to="/login" className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 text-white text-xs font-semibold rounded-lg hover:bg-indigo-700 transition-all shadow-sm">
+                                Launch Hub <Zap className="w-3.5 h-3.5" />
                             </Link>
                         )}
                     </div>
 
                     {/* Mobile Menu Button */}
                     <button
-                        onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                        className="md:hidden p-3 bg-slate-100 rounded-2xl text-slate-900"
+                        onClick={() => setIsMobileMenuOpen(v => !v)}
+                        className="md:hidden p-2 bg-slate-100 rounded-lg text-slate-700"
                     >
-                        {isMobileMenuOpen ? <X /> : <Menu />}
+                        {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
                     </button>
                 </div>
-            </div>
 
-            {/* Mobile Menu */}
-            <AnimatePresence>
+                {/* Mobile Menu — instant, no animation */}
                 {isMobileMenuOpen && (
-                    <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="md:hidden bg-white border-b border-slate-100 overflow-hidden"
-                    >
-                        <div className="px-6 py-10 space-y-6">
-                            {navLinks.map((link) => (
+                    <div className="md:hidden bg-white border-b border-slate-200 shadow-sm">
+                        <div className="px-4 py-4 space-y-1">
+                            {navLinks.map(link => (
                                 <Link
                                     key={link.path}
                                     to={link.path}
                                     onClick={() => setIsMobileMenuOpen(false)}
-                                    className="flex items-center gap-6 text-lg font-black text-slate-900 uppercase tracking-tighter"
+                                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-all"
                                 >
-                                    <link.icon className="w-6 h-6 text-blue-600" />
+                                    <link.icon className="w-4 h-4 text-slate-400" />
                                     {link.name}
                                 </Link>
                             ))}
-                            <div className="pt-6 border-t border-slate-100">
+                            <div className="pt-2 mt-2 border-t border-slate-100">
                                 {user ? (
-                                    <button onClick={handleLogout} className="flex items-center gap-6 text-lg font-black text-red-500 uppercase tracking-tighter">
-                                        <LogOut className="w-6 h-6" /> Terminate Session
+                                    <button onClick={handleLogout} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold text-red-500 hover:bg-red-50 transition-all w-full">
+                                        <LogOut className="w-4 h-4" /> Sign Out
                                     </button>
                                 ) : (
-                                    <Link to="/login" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-6 text-lg font-black text-blue-600 uppercase tracking-tighter">
-                                        <Zap className="w-6 h-6" /> Launch Hub
+                                    <Link to="/login" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold text-indigo-600 hover:bg-indigo-50 transition-all">
+                                        <Zap className="w-4 h-4" /> Launch Hub
                                     </Link>
                                 )}
                             </div>
                         </div>
-                    </motion.div>
+                    </div>
                 )}
-            </AnimatePresence>
-        </nav>
+            </nav>
+
+            {/* Spacer so content isn't hidden behind fixed navbar */}
+            <div className="h-14" />
+        </>
     );
 };
 
