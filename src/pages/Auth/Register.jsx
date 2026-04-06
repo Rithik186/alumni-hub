@@ -113,7 +113,7 @@ const Register = () => {
                             <div className="w-10 h-10 bg-primary-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
                                 <GraduationCap className="text-white w-6 h-6" />
                             </div>
-                            <span className="text-2xl font-bold tracking-tight">AlumniHub</span>
+                            <span className="text-2xl font-bold tracking-tight">Alumned In</span>
                         </Link>
                         <h1 className="text-5xl font-black text-white leading-tight mb-6 tracking-tight">
                             Build your <span className="text-primary-500">Future</span> with the best.

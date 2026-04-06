@@ -10,18 +10,18 @@ import SpotlightCard from '../animations/SpotlightCard';
 
 const FloatingCard = ({ icon, title, subtitle, position, delay }) => (
     <motion.div
-        className={`absolute ${position} bg-white/40 backdrop-blur-2xl p-4 rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.1)] border border-white/40 flex items-center gap-4 z-20 group hover:bg-white/60 transition-colors`}
+        className={`absolute ${position} bg-white/40 backdrop-blur-2xl p-3.5 rounded-[1.75rem] shadow-[0_15px_40px_rgba(0,0,0,0.08)] border border-white/40 flex items-center gap-3.5 z-20 group hover:bg-white/60 transition-colors`}
         initial={{ opacity: 0, scale: 0.8, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ duration: 0.8, delay, ease: "easeOut" }}
-        whileHover={{ y: -10, transition: { duration: 0.3 } }}
+        whileHover={{ y: -8, transition: { duration: 0.3 } }}
     >
-        <div className="w-12 h-12 bg-primary-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-primary-500/30 group-hover:rotate-12 transition-transform">
-            {icon}
+        <div className="w-10 h-10 bg-primary-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-primary-500/30 group-hover:rotate-12 transition-transform">
+            {React.cloneElement(icon, { className: "w-5 h-5" })}
         </div>
         <div>
-            <h4 className="text-sm font-black text-slate-800 leading-tight tracking-tight uppercase">{title}</h4>
-            <p className="text-[11px] text-slate-500 font-bold">{subtitle}</p>
+            <h4 className="text-[13px] font-black text-slate-800 leading-tight tracking-tight uppercase">{title}</h4>
+            <p className="text-[10px] text-slate-500 font-bold">{subtitle}</p>
         </div>
     </motion.div>
 );
@@ -30,7 +30,7 @@ export const Hero = () => {
     const { user } = useUser();
 
     return (
-        <section className="relative min-h-[90vh] flex items-center justify-center bg-white overflow-hidden pt-24 pb-12">
+        <section className="relative min-h-[80vh] flex items-center justify-center bg-white overflow-hidden pt-20 pb-8">
             {/* Background Decorative Elements */}
             <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
                 <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary-200/40 rounded-full mix-blend-multiply filter blur-[100px] animate-blob"></div>
@@ -42,7 +42,7 @@ export const Hero = () => {
             </div>
 
             <div className="container mx-auto px-6 relative z-10">
-                <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-24">
+                <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-16">
                     {/* Left Content */}
                     <div className="flex-[1.2] text-center lg:text-left">
                         {user ? (
@@ -72,7 +72,7 @@ export const Hero = () => {
                                 >
                                     <span className="flex h-2.5 w-2.5 rounded-full bg-primary-500 animate-pulse"></span>
                                     <span className="text-xs font-black text-white uppercase tracking-[0.2em]">
-                                        <ShinyText text="Over 5,000 Verified Alumni" speed={4} />
+                                        <ShinyText text="Verified Alumni Network" speed={4} />
                                     </span>
                                 </motion.div>
                             </FadeContent>
@@ -80,7 +80,7 @@ export const Hero = () => {
 
                         <FadeContent blur duration={800} delay={200}>
                             <motion.h1
-                                className="text-6xl md:text-8xl font-black text-slate-900 leading-[0.9] mb-8 tracking-tighter"
+                                className="text-5xl md:text-7xl font-black text-slate-900 leading-[0.9] mb-6 tracking-tighter"
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ duration: 0.8, delay: 0.2 }}
@@ -101,7 +101,7 @@ export const Hero = () => {
 
                         <FadeContent blur duration={800} delay={400}>
                             <motion.p
-                                className="text-xl md:text-2xl text-slate-500 mb-12 max-w-2xl mx-auto lg:mx-0 font-medium leading-relaxed"
+                                className="text-lg md:text-xl text-slate-500 mb-10 max-w-2xl mx-auto lg:mx-0 font-medium leading-relaxed"
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ duration: 0.8, delay: 0.4 }}
@@ -123,10 +123,10 @@ export const Hero = () => {
                                     </Link>
                                 ) : (
                                     <>
-                                        <Link to="/register" className="w-full sm:w-auto px-10 py-5 bg-primary-600 text-white rounded-[2rem] font-black text-lg shadow-[0_20px_40px_rgba(37,99,235,0.3)] hover:shadow-[0_25px_50px_rgba(37,99,235,0.4)] hover:bg-primary-700 transition-all flex items-center justify-center gap-3 group">
-                                            Join Network <ArrowRight className="w-6 h-6 group-hover:translate-x-2 transition-transform" />
+                                        <Link to="/register" className="w-full sm:w-auto px-8 py-4 bg-primary-600 text-white rounded-[1.5rem] font-black text-base shadow-[0_20px_40px_rgba(37,99,235,0.3)] hover:shadow-[0_25px_50px_rgba(37,99,235,0.4)] hover:bg-primary-700 transition-all flex items-center justify-center gap-3 group">
+                                            Join Network <ArrowRight className="w-5 h-5 group-hover:translate-x-2 transition-transform" />
                                         </Link>
-                                        <Link to="/login" className="w-full sm:w-auto px-10 py-5 bg-white text-slate-900 border-2 border-slate-100 rounded-[2rem] font-black text-lg hover:border-primary-600 transition-all flex items-center justify-center gap-3">
+                                        <Link to="/login" className="w-full sm:w-auto px-8 py-4 bg-white text-slate-900 border-2 border-slate-100 rounded-[1.5rem] font-black text-base hover:border-primary-600 transition-all flex items-center justify-center gap-3">
                                             Sign In
                                         </Link>
                                     </>
@@ -134,39 +134,11 @@ export const Hero = () => {
                             </motion.div>
                         </FadeContent>
 
-                        <FadeContent blur duration={1000} delay={800}>
-                            <motion.div
-                                className="mt-16 flex items-center justify-center lg:justify-start gap-8"
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                transition={{ duration: 1, delay: 0.8 }}
-                            >
-                                <div className="flex -space-x-4">
-                                    {[1, 2, 3, 4].map((i) => (
-                                        <div key={i} className={`w-14 h-14 rounded-full border-4 border-white bg-slate-100 flex items-center justify-center shadow-lg overflow-hidden`}>
-                                            <div className="w-full h-full bg-slate-200 flex items-center justify-center">
-                                                <Users className="w-6 h-6 text-slate-400" />
-                                            </div>
-                                        </div>
-                                    ))}
-                                    <div className="w-14 h-14 rounded-full border-4 border-white bg-primary-600 flex items-center justify-center shadow-lg z-10 text-white text-xs font-black">
-                                        +5K
-                                    </div>
-                                </div>
-                                <div className="text-left">
-                                    <div className="flex items-center gap-2 text-primary-600 mb-1">
-                                        <CheckCircle className="w-5 h-5 fill-primary-600 text-white" />
-                                        <span className="text-sm font-black uppercase tracking-tight">Verified Campus Network</span>
-                                    </div>
-                                    <p className="text-xs text-slate-400 font-bold tracking-[0.1em] uppercase">Trusted by Global Institutes</p>
-                                </div>
-                            </motion.div>
-                        </FadeContent>
                     </div>
 
                     {/* Right Visual Element */}
                     <motion.div
-                        className="flex-1 relative hidden lg:block h-[700px]"
+                        className="flex-1 relative hidden lg:block h-[600px]"
                         initial={{ opacity: 0, x: 50 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ duration: 1 }}
@@ -177,15 +149,15 @@ export const Hero = () => {
 
                             {/* Inner Glass Card — Wrapped in SpotlightCard */}
                             <SpotlightCard
-                                className="relative z-10 bg-white shadow-[0_50px_100px_rgba(0,0,0,0.1)] p-8 rounded-[3rem] border border-white overflow-hidden group"
+                                className="relative z-10 bg-white shadow-[0_40px_80px_rgba(0,0,0,0.08)] p-6 rounded-[2.5rem] border border-white overflow-hidden group"
                                 spotlightColor="rgba(14, 165, 233, 0.12)"
                             >
                                 <div className="absolute inset-0 bg-gradient-to-br from-primary-600/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                                <div className="w-80 h-[450px] relative z-10 flex flex-col items-center justify-center text-center">
-                                    <div className="w-32 h-32 bg-primary-100 rounded-[2.5rem] flex items-center justify-center mb-10 group-hover:scale-110 transition-transform duration-500">
-                                        <Network className="w-16 h-16 text-primary-600" />
+                                <div className="w-72 h-[400px] relative z-10 flex flex-col items-center justify-center text-center">
+                                    <div className="w-28 h-28 bg-primary-100 rounded-[2rem] flex items-center justify-center mb-8 group-hover:scale-110 transition-transform duration-500">
+                                        <Network className="w-14 h-14 text-primary-600" />
                                     </div>
-                                    <h3 className="text-3xl font-black text-slate-900 mb-4 leading-tight">Elite Mentorship</h3>
+                                    <h3 className="text-2xl font-black text-slate-900 mb-3 leading-tight">Elite Mentorship</h3>
                                     <p className="text-slate-500 font-medium px-4 mb-10 leading-relaxed">
                                         Exclusive access to mock interviews and career pivots shared by established alumni.
                                     </p>
@@ -214,7 +186,7 @@ export const Hero = () => {
                                 icon={<Video className="w-6 h-6" />}
                                 title="Live AMA Sessions"
                                 subtitle="Weekly expert meets"
-                                position="bottom-12 -right-12"
+                                position="bottom-12 -right-4"
                                 delay={1.4}
                             />
 
@@ -222,7 +194,7 @@ export const Hero = () => {
                                 icon={<Zap className="w-6 h-6" />}
                                 title="Real-time Alerts"
                                 subtitle="Instant notifications"
-                                position="top-1/4 -right-20"
+                                position="top-1/4 -right-8"
                                 delay={1.8}
                             />
                         </div>

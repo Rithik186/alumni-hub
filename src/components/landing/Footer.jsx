@@ -12,7 +12,7 @@ export const Footer = () => {
                 <FadeContent blur duration={600}>
                     <div className="col-span-1 md:col-span-1">
                         <h2 className="text-2xl font-bold text-white mb-4">
-                            <ShinyText text="AlumniHub" speed={4} className="text-white" />
+                            <ShinyText text="Alumned In" speed={4} className="text-white" />
                         </h2>
                         <p className="text-sm leading-relaxed mb-6 opacity-75">
                             Connecting the past, present, and future of our institution. Join the network today.
@@ -72,7 +72,7 @@ export const Footer = () => {
             </div>
             <FadeContent blur duration={800} delay={400}>
                 <div className="border-t border-slate-800 mt-12 pt-8 text-center text-sm opacity-50">
-                    &copy; {new Date().getFullYear()} AlumniHub. All rights reserved.
+                    &copy; {new Date().getFullYear()} Alumned In. All rights reserved.
                 </div>
             </FadeContent>
         </footer>

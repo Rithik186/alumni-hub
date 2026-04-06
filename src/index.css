@@ -4,6 +4,10 @@
 @tailwind components;
 @tailwind utilities;
 
+html {
+  font-size: 95%;
+}
+
 :root {
   --primary: #0f172a;
   --accent: #4f46e5;

@@ -113,7 +113,7 @@ export const Navbar = () => {
                             </div>
                         ) : (
                             <Link to="/login" className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 text-white text-xs font-semibold rounded-lg hover:bg-indigo-700 transition-all shadow-sm">
-                                Launch Hub <Zap className="w-3.5 h-3.5" />
+                                Launch Alumned In <Zap className="w-3.5 h-3.5" />
                             </Link>
                         )}
                     </div>
@@ -149,7 +149,7 @@ export const Navbar = () => {
                                     </button>
                                 ) : (
                                     <Link to="/login" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold text-indigo-600 hover:bg-indigo-50 transition-all">
-                                        <Zap className="w-4 h-4" /> Launch Hub
+                                        <Zap className="w-4 h-4" /> Launch Alumned In
                                     </Link>
                                 )}
                             </div>
