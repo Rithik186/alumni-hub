@@ -41,6 +41,12 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/chat', chatRoutes);
 
+// Health check endpoint for "keep-alive" bots
+app.get('/api/health', (req, res) => {
+    res.status(200).json({ status: 'active', message: 'Alumned In server is running' });
+});
+
+
 // Error Handling Middleware
 app.use((err, req, res, next) => {
     console.error(err.stack);
