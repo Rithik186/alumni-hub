@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { Mail, Lock, ArrowRight, Github, Chrome, CheckCircle2, ShieldCheck, GraduationCap, Eye, EyeOff } from 'lucide-react';
-import { login as loginService } from '../../services/authService';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Mail, Lock, ArrowRight, GraduationCap, Eye, EyeOff, Smartphone, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { login as loginService, verifyOtp as verifyOtpService } from '../../services/authService';
 import { useUser } from '../../context/UserContext';
 
 const Login = () => {
     const navigate = useNavigate();
     const { login } = useUser();
     const [formData, setFormData] = useState({ email: '', password: '' });
+    const [step, setStep] = useState(1); // 1: Credentials, 2: OTP
+    const [otp, setOtp] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
@@ -23,7 +25,9 @@ const Login = () => {
         setError('');
         try {
             const data = await loginService(formData);
-            if (data.token) {
+            if (data.otp_sent) {
+                setStep(2);
+            } else if (data.token) {
                 login(data);
                 navigate('/dashboard');
             } else {
@@ -31,6 +35,25 @@ const Login = () => {
             }
         } catch (err) {
             setError('Connection error. Please try again.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleVerifyOtp = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        setError('');
+        try {
+            const data = await verifyOtpService({ email: formData.email, otp_code: otp });
+            if (data.token) {
+                login(data);
+                navigate('/dashboard');
+            } else {
+                setError(data.message || 'Invalid OTP');
+            }
+        } catch (err) {
+            setError('Verification failed');
         } finally {
             setLoading(false);
         }
@@ -111,8 +134,12 @@ const Login = () => {
                         animate={{ opacity: 1, y: 0 }}
                         className="text-center lg:text-left mb-10"
                     >
-                        <h2 className="text-3xl font-extrabold text-slate-900 mb-3 tracking-tight">Login to your account</h2>
-                        <p className="text-slate-500 font-medium">Welcome back! Please enter your details.</p>
+                        <h2 className="text-3xl font-extrabold text-slate-900 mb-3 tracking-tight">
+                            {step === 1 ? 'Login to your account' : 'Security Check'}
+                        </h2>
+                        <p className="text-slate-500 font-medium">
+                            {step === 1 ? 'Welcome back! Please enter your details.' : 'Please verify your identity to continue.'}
+                        </p>
                     </motion.div>
 
                     {error && (
@@ -126,71 +153,121 @@ const Login = () => {
                         </motion.div>
                     )}
 
-                    <form onSubmit={handleLogin} className="space-y-6">
-                        <div className="space-y-4">
-                            <div className="space-y-1.5 focus-within:text-primary-600 transition-colors">
-                                <label className="text-sm font-bold text-slate-700 ml-1">Email Address</label>
-                                <div className="relative group">
-                                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-primary-500 transition-colors" />
-                                    <input
-                                        name="email"
-                                        type="text"
-                                        placeholder="name@college.edu or admin"
-                                        onChange={handleChange}
-                                        required
-                                        className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 focus:bg-white outline-none transition-all font-medium"
-                                    />
-                                </div>
-                            </div>
+                    <AnimatePresence mode="wait">
+                        {step === 1 ? (
+                            <motion.form
+                                key="login"
+                                initial={{ opacity: 0, x: 20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                exit={{ opacity: 0, x: -20 }}
+                                onSubmit={handleLogin}
+                                className="space-y-6"
+                            >
+                                <div className="space-y-4">
+                                    <div className="space-y-1.5 focus-within:text-primary-600 transition-colors">
+                                        <label className="text-sm font-bold text-slate-700 ml-1">Email Address</label>
+                                        <div className="relative group">
+                                            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-primary-500 transition-colors" />
+                                            <input
+                                                name="email"
+                                                type="text"
+                                                placeholder="name@college.edu or admin"
+                                                onChange={handleChange}
+                                                required
+                                                className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 focus:bg-white outline-none transition-all font-medium"
+                                            />
+                                        </div>
+                                    </div>
 
-                            <div className="space-y-1.5 focus-within:text-primary-600 transition-colors">
-                                <div className="flex justify-between items-center px-1">
-                                    <label className="text-sm font-bold text-slate-700">Password</label>
-                                    <Link to="/forgot-password" size="sm" className="text-xs font-bold text-primary-600 hover:text-primary-700 transition-colors">
-                                        Forgot Password?
-                                    </Link>
+                                    <div className="space-y-1.5 focus-within:text-primary-600 transition-colors">
+                                        <div className="flex justify-between items-center px-1">
+                                            <label className="text-sm font-bold text-slate-700">Password</label>
+                                            <Link to="/forgot-password" size="sm" className="text-xs font-bold text-primary-600 hover:text-primary-700 transition-colors">
+                                                Forgot Password?
+                                            </Link>
+                                        </div>
+                                        <div className="relative group">
+                                            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-primary-500 transition-colors" />
+                                            <input
+                                                name="password"
+                                                type={showPassword ? "text" : "password"}
+                                                placeholder="••••••••"
+                                                onChange={handleChange}
+                                                required
+                                                className="w-full pl-12 pr-12 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 focus:bg-white outline-none transition-all font-medium"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowPassword(!showPassword)}
+                                                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-1"
+                                            >
+                                                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div className="relative group">
-                                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-primary-500 transition-colors" />
-                                    <input
-                                        name="password"
-                                        type={showPassword ? "text" : "password"}
-                                        placeholder="••••••••"
-                                        onChange={handleChange}
-                                        required
-                                        className="w-full pl-12 pr-12 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 focus:bg-white outline-none transition-all font-medium"
-                                    />
+
+                                <div className="flex items-center gap-2 px-1">
+                                    <input type="checkbox" id="remember" className="w-4 h-4 rounded text-primary-600 border-slate-300 focus:ring-primary-500" />
+                                    <label htmlFor="remember" className="text-sm font-semibold text-slate-600">Keep me logged in</label>
+                                </div>
+
+                                <button
+                                    disabled={loading}
+                                    className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-4 rounded-2xl transition-all shadow-xl shadow-slate-200 hover:shadow-slate-300 active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 group"
+                                >
+                                    {loading ? (
+                                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                    ) : (
+                                        <>
+                                            Sign In <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                                        </>
+                                    )}
+                                </button>
+                            </motion.form>
+                        ) : (
+                            <motion.form
+                                key="otp"
+                                initial={{ opacity: 0, x: 20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                exit={{ opacity: 0, x: -20 }}
+                                onSubmit={handleVerifyOtp}
+                                className="space-y-8 py-4"
+                            >
+                                <div className="text-center space-y-2">
+                                    <div className="w-16 h-16 bg-primary-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                                        <Smartphone className="w-8 h-8 text-primary-600" />
+                                    </div>
+                                    <p className="text-slate-500 font-bold">Verification code sent to email</p>
+                                    <p className="text-lg font-black text-slate-800">{formData.email}</p>
+                                </div>
+
+                                <input
+                                    placeholder="000000"
+                                    maxLength="6"
+                                    value={otp}
+                                    onChange={(e) => setOtp(e.target.value)}
+                                    className="w-full p-6 text-center text-4xl tracking-[0.5em] font-black border-2 border-slate-100 rounded-[2rem] focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none transition-all shadow-inner bg-slate-50"
+                                />
+
+                                <div className="space-y-3 pt-4">
+                                    <button
+                                        disabled={loading}
+                                        className="w-full bg-primary-600 hover:bg-primary-700 text-white font-black py-5 px-4 rounded-[2rem] transition-all shadow-xl shadow-primary-200 active:scale-[0.98] disabled:opacity-50 uppercase tracking-[0.2em] text-xs"
+                                    >
+                                        {loading ? 'Verifying...' : 'Confirm Login'}
+                                    </button>
                                     <button
                                         type="button"
-                                        onClick={() => setShowPassword(!showPassword)}
-                                        className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-1"
+                                        onClick={() => setStep(1)}
+                                        className="w-full text-slate-400 font-black uppercase tracking-widest text-[10px] hover:text-primary-600 transition-colors"
                                     >
-                                        {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                                        Back to login details
                                     </button>
                                 </div>
-                            </div>
-                        </div>
-
-                        <div className="flex items-center gap-2 px-1">
-                            <input type="checkbox" id="remember" className="w-4 h-4 rounded text-primary-600 border-slate-300 focus:ring-primary-500" />
-                            <label htmlFor="remember" className="text-sm font-semibold text-slate-600">Keep me logged in</label>
-                        </div>
-
-                        <button
-                            disabled={loading}
-                            className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-4 rounded-2xl transition-all shadow-xl shadow-slate-200 hover:shadow-slate-300 active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 group"
-                        >
-                            {loading ? (
-                                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                            ) : (
-                                <>
-                                    Sign In <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                                </>
-                            )}
-                        </button>
-                    </form>
-
-
+                            </motion.form>
+                        )}
+                    </AnimatePresence>
 
                     <p className="mt-12 text-center text-slate-500 font-medium">
                         New to the platform? <Link to="/register" className="text-primary-600 hover:text-primary-700 font-bold underline underline-offset-4 decoration-2">Create an account</Link>

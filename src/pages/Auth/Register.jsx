@@ -60,9 +60,7 @@ const Register = () => {
         try {
             const data = await register({ ...formData, role });
             if (data.otp_sent) {
-                setOtp(data.mock_otp || '123456'); // Auto-fill the mock OTP
                 setStep(2);
-                alert(`DEMO MODE: Your OTP is ${data.mock_otp}`);
             } else {
                 setError(data.message || 'Registration failed');
             }
@@ -78,7 +76,7 @@ const Register = () => {
         setLoading(true);
         setError('');
         try {
-            const data = await verifyOtpService({ phone_number: formData.phone_number, otp_code: otp });
+            const data = await verifyOtpService({ email: formData.email, otp_code: otp });
             if (data.token) {
                 login(data);
                 navigate('/dashboard');
@@ -159,7 +157,7 @@ const Register = () => {
                             {step === 1 ? 'Create Account' : 'Security Check'}
                         </h2>
                         <p className="text-slate-500 font-bold text-sm uppercase tracking-widest">
-                            {step === 1 ? 'Start your professional journey today' : 'Please verify your mobile number'}
+                            {step === 1 ? 'Start your professional journey today' : 'Please verify your email address'}
                         </p>
                     </motion.div>
 
@@ -324,10 +322,10 @@ const Register = () => {
                             >
                                 <div className="text-center space-y-2">
                                     <div className="w-16 h-16 bg-primary-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                                        <Smartphone className="w-8 h-8 text-primary-600" />
+                                        <Mail className="w-8 h-8 text-primary-600" />
                                     </div>
-                                    <p className="text-slate-500 font-bold">Verification code sent to</p>
-                                    <p className="text-lg font-black text-slate-800">{formData.phone_number}</p>
+                                    <p className="text-slate-500 font-bold">Verification code sent to email</p>
+                                    <p className="text-lg font-black text-slate-800">{formData.email}</p>
                                 </div>
 
                                 <input

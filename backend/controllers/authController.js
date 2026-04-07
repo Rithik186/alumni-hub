@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import db from '../config/db.js';
 import generateToken from '../utils/generateToken.js';
+import { sendEmailOtp } from '../utils/emailService.js';
 
 // @desc    Register a new user (Student or Alumni)
 // @route   POST /api/auth/register
@@ -25,14 +26,14 @@ export const registerUser = async (req, res) => {
         const salt = await bcrypt.genSalt(10);
         const password_hash = await bcrypt.hash(password, salt);
 
-        // 3. Generate Mock OTP
+        // 3. Generate OTP
         const otp_code = Math.floor(100000 + Math.random() * 900000).toString();
         const otp_expiry = new Date(Date.now() + 10 * 60000); // 10 minutes from now
 
-        // Auto-approve and activate for demo purposes
-        const isApproved = true;
+        // Production flow: Accounts start unverified
+        const isApproved = role === 'student'; // Auto-approve students, alumni need admin
         const isActive = true;
-        const isVerified = true; // Auto-verify for ultra-smooth demo flow
+        const isVerified = false; // Must verify email OTP
 
         const newUser = await db.query(
             'INSERT INTO users (name, email, phone_number, password_hash, role, college, otp_code, otp_expiry, is_approved, is_active, is_verified) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id',
@@ -54,15 +55,13 @@ export const registerUser = async (req, res) => {
             );
         }
 
-        console.log(`[MOCK OTP] Sent to ${phone_number}: ${otp_code}`);
+        // 4. Send Real Email OTP
+        await sendEmailOtp(email, otp_code, name);
 
         res.status(201).json({
-            message: role === 'alumni'
-                ? 'User registered. Please verify your phone number. Note: Alumni accounts require admin approval after verification.'
-                : 'User registered. Please verify your phone number with the OTP.',
-            phone_number,
-            otp_sent: true,
-            mock_otp: otp_code // Added for frontend to naturally display in demo environments
+            message: 'Registration successful. please check your email for the verification code.',
+            email,
+            otp_sent: true
         });
 
     } catch (error) {
@@ -81,10 +80,10 @@ export const registerUser = async (req, res) => {
 
 // @desc    Verify OTP and Login
 export const verifyOtp = async (req, res) => {
-    const { phone_number, otp_code } = req.body;
+    const { email, phone_number, otp_code } = req.body;
 
     try {
-        const userResult = await db.query('SELECT * FROM users WHERE phone_number = $1', [phone_number]);
+        const userResult = await db.query('SELECT * FROM users WHERE email = $1 OR phone_number = $2', [email, phone_number]);
         const user = userResult.rows[0];
 
         if (!user || user.otp_code !== otp_code) {
@@ -125,7 +124,22 @@ export const loginUser = async (req, res) => {
 
         if (user && (await bcrypt.compare(password, user.password_hash))) {
             if (!user.is_verified) {
-                return res.status(401).json({ message: 'Please verify your phone number first' });
+                // Generate and Send OTP if not verified
+                const otp_code = Math.floor(100000 + Math.random() * 900000).toString();
+                const otp_expiry = new Date(Date.now() + 10 * 60000); // 10 minutes
+
+                await db.query(
+                    'UPDATE users SET otp_code = $1, otp_expiry = $2 WHERE id = $3',
+                    [otp_code, otp_expiry, user.id]
+                );
+
+                await sendEmailOtp(user.email, otp_code, user.name);
+
+                return res.status(200).json({ 
+                    otp_sent: true, 
+                    email: user.email,
+                    message: 'Account not verified. Verification code sent to your email.' 
+                });
             }
 
             if (user.role === 'alumni' && !user.is_approved) {
@@ -206,9 +220,9 @@ export const forgotPassword = async (req, res) => {
             [otp_code, otp_expiry, user.id]
         );
 
-        console.log(`[MOCK RESET OTP] Sent to ${user.email}: ${otp_code}`);
+        await sendEmailOtp(user.email, otp_code, user.name);
 
-        res.json({ message: 'OTP sent to your email (Mocked in console)', email });
+        res.json({ message: 'Verification code sent to your email', email });
 
     } catch (error) {
         console.error('Forgot Password Error:', error);
