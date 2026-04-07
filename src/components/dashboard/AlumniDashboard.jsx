@@ -225,7 +225,7 @@ const AlumniDashboard = () => {
         { id: 'network', label: 'Network', icon: Users, path: '/network' },
         { id: 'notifications', label: 'Alerts', icon: Bell, isTab: true },
         { id: 'chat', label: 'Messages', icon: MessageSquare, path: '/chat' },
-        { id: 'settings', label: 'Settings', icon: Settings, path: '/profile' },
+        { id: 'settings', label: 'Settings', icon: Settings, path: '/settings' },
     ];
 
     // ── Queries ──────────────────────────────────────────────────────────────
@@ -238,8 +238,9 @@ const AlumniDashboard = () => {
             ]);
             return { requests: followRequestsRes.data, profile: profileRes.data };
         },
-        staleTime: 30000, // 30s stale time
-        refetchInterval: 30000 // Only poll every 30s
+        staleTime: 5 * 60 * 1000, 
+        refetchInterval: 5 * 60 * 1000,
+        refetchOnWindowFocus: false,
     });
 
     // Dedicated unread count for the badge (much lighter than full list)
@@ -259,7 +260,9 @@ const AlumniDashboard = () => {
     const { data: stats = { followers: 0, following: 0 } } = useQuery({
         queryKey: ['socialStats'],
         queryFn: async () => (await axios.get('/api/connections/stats', authHeader(user.token))).data,
-        staleTime: 120000, retry: 1,
+        queryFn: async () => (await axios.get('/api/connections/stats', authHeader(user.token))).data,
+        staleTime: 10 * 60 * 1000, retry: 1,
+        refetchOnWindowFocus: false,
     });
 
     const { data: myPosts = [], isLoading: feedLoading, error: feedError } = useQuery({
@@ -268,8 +271,9 @@ const AlumniDashboard = () => {
             const { data } = await axios.get('/api/posts/feed', authHeader(user.token));
             return Array.isArray(data) ? data : [];
         },
-        staleTime: 60000,
-        refetchInterval: 60000,
+        staleTime: 5 * 60 * 1000,
+        refetchInterval: 5 * 60 * 1000,
+        refetchOnWindowFocus: false,
         retry: 2,
     });
 
@@ -644,7 +648,8 @@ const AlumniDashboard = () => {
                                 <CardContent className="pt-0">
                                     <div className="space-y-0.5">
                                         {[
-                                            { label: 'My Profile', path: '/profile', icon: Settings, desc: 'Edit your information' },
+                                            { label: 'My Profile', path: '/profile', icon: Settings, desc: 'View your profile' },
+                                            { label: 'Settings', path: '/settings', icon: Settings, desc: 'Manage preferences' },
                                             { label: 'Messages', path: '/chat', icon: MessageSquare, desc: 'Chat with connections' },
                                             { label: 'My Network', path: '/network', icon: Users, desc: 'View your connections' },
                                         ].map(l => (
@@ -729,7 +734,7 @@ const AlumniDashboard = () => {
                         { id: 'network', icon: Users, label: 'Network', path: '/network' },
                         { id: 'notifications', icon: Bell, label: 'Alerts', isTab: true },
                         { id: 'chat', icon: MessageSquare, label: 'Chat', path: '/chat' },
-                        { id: 'profile', icon: Settings, label: 'Profile', path: '/profile' },
+                        { id: 'settings', icon: Settings, label: 'Settings', path: '/settings' },
                     ].map(item => {
                         const isActive = item.id === 'feed' ? activeTab === 'feed' : item.id === activeTab;
                         const inner = (

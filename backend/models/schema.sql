@@ -20,6 +20,7 @@ CREATE TABLE users (
     is_verified BOOLEAN DEFAULT FALSE,
     is_approved BOOLEAN DEFAULT FALSE, -- Admin approval for alumni
     is_active BOOLEAN DEFAULT TRUE,
+    profile_picture TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

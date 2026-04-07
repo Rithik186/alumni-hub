@@ -134,8 +134,8 @@ const Login = () => {
                                     <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-primary-500 transition-colors" />
                                     <input
                                         name="email"
-                                        type="email"
-                                        placeholder="name@college.edu"
+                                        type="text"
+                                        placeholder="name@college.edu or admin"
                                         onChange={handleChange}
                                         required
                                         className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 focus:bg-white outline-none transition-all font-medium"

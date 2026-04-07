@@ -158,31 +158,29 @@ export const loginUser = async (req, res) => {
 // @access  Private
 export const getMe = async (req, res) => {
     try {
-        const userResult = await db.query(
-            'SELECT id, name, email, phone_number, role, college, is_verified, created_at, profile_picture FROM users WHERE id = $1',
-            [req.user.id]
-        );
-
-        if (userResult.rows.length === 0) {
-            return res.status(404).json({ message: 'User not found' });
-        }
-
-        const user = userResult.rows[0];
+        const userRes = await db.query('SELECT * FROM users WHERE id = $1', [req.user.id]);
+        if (userRes.rows.length === 0) return res.status(404).json({ message: 'User not found' });
+        
         let profile = null;
-
-        if (user.role === 'student') {
-            const studentResult = await db.query('SELECT * FROM student_profiles WHERE user_id = $1', [user.id]);
-            profile = studentResult.rows[0];
-        } else if (user.role === 'alumni') {
-            const alumniResult = await db.query('SELECT * FROM alumni_profiles WHERE user_id = $1', [user.id]);
-            profile = alumniResult.rows[0];
+        if (userRes.rows[0].role === 'student') {
+            const spRes = await db.query('SELECT * FROM student_profiles WHERE user_id = $1', [req.user.id]);
+            profile = spRes.rows[0];
+        } else if (userRes.rows[0].role === 'alumni') {
+            const apRes = await db.query('SELECT * FROM alumni_profiles WHERE user_id = $1', [req.user.id]);
+            profile = apRes.rows[0];
         }
-
+        
+        const user = userRes.rows[0];
+        delete user.password_hash;
         res.json({ ...user, profile });
 
     } catch (error) {
-        console.error('Get Profile Error:', error);
-        res.status(500).json({ message: 'Server error fetching profile' });
+        console.error('CRITICAL: Get Profile Error:', error);
+        res.status(500).json({ 
+            message: 'Server error fetching profile', 
+            error: error.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
     }
 };
 // @desc    Request OTP for password reset

@@ -231,7 +231,7 @@ const StudentDashboard = () => {
         { id: 'network', label: 'Network',  icon: Users,           path: '/network' },
         { id: 'search',  label: 'Discover', icon: Compass,         path: null },
         { id: 'chat',    label: 'Messages', icon: MessageSquare,   path: '/chat' },
-        { id: 'settings', label: 'Settings',  icon: Settings,        path: '/settings' },
+        { id: 'settings', label: 'Settings', icon: Settings, path: '/settings' },
     ];
 
     // ── Queries ──────────────────────────────────────────────────────────────
@@ -241,15 +241,17 @@ const StudentDashboard = () => {
             const { data } = await axios.get('/api/posts/feed', authHeader(user.token));
             return Array.isArray(data) ? data : [];
         },
-        staleTime: 60000,
-        refetchInterval: 60000,
+        staleTime: 5 * 60 * 1000, // 5 minutes stale time
+        refetchInterval: 5 * 60 * 1000, // Poll every 5 minutes
+        refetchOnWindowFocus: false,
         retry: 2,
     });
 
     const { data: stats = { followers: 0, following: 0 } } = useQuery({
         queryKey: ['socialStats'],
         queryFn: async () => (await axios.get('/api/connections/stats', authHeader(user.token))).data,
-        staleTime: 120000, retry: 1,
+        staleTime: 10 * 60 * 1000, retry: 1,
+        refetchOnWindowFocus: false,
     });
 
     const { data: suggestions = [] } = useQuery({
@@ -258,13 +260,15 @@ const StudentDashboard = () => {
             const { data } = await axios.get('/api/connections/suggestions', authHeader(user.token));
             return Array.isArray(data) ? data.slice(0, 5) : [];
         },
-        staleTime: 300000, retry: 1,
+        staleTime: 15 * 60 * 1000, retry: 1,
+        refetchOnWindowFocus: false,
     });
 
     const { data: followStatuses = {} } = useQuery({
         queryKey: ['myFollowStatuses'],
         queryFn: async () => (await axios.get('/api/connections/my-statuses', authHeader(user.token))).data || {},
-        staleTime: 30000, retry: 1,
+        staleTime: 2 * 60 * 1000, retry: 1,
+        refetchOnWindowFocus: false,
     });
 
     const searchEnabled = view === 'search' && (!!searchQuery || Object.values(searchFilters).some(Boolean));
@@ -627,7 +631,8 @@ const StudentDashboard = () => {
                                 <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Quick Links</p>
                                 <div className="space-y-0.5">
                                     {[
-                                        { label: 'My Profile', path: '/profile', icon: Settings, desc: 'Edit your information' },
+                                        { label: 'My Profile', path: '/profile', icon: Settings, desc: 'View your profile' },
+                                        { label: 'Settings', path: '/settings', icon: Settings, desc: 'Manage preferences' },
                                         { label: 'Messages', path: '/chat', icon: MessageSquare, desc: 'Chat with connections' },
                                         { label: 'My Network', path: '/network', icon: Users, desc: 'View your connections' },
                                     ].map(l => (
@@ -696,7 +701,7 @@ const StudentDashboard = () => {
                         { id: 'network', icon: Users,           label: 'Network',  path: '/network' },
                         { id: 'search',  icon: Compass,         label: 'Discover', path: null },
                         { id: 'chat',    icon: MessageSquare,   label: 'Chat',     path: '/chat' },
-                        { id: 'profile', icon: Settings,        label: 'Profile',  path: '/profile' },
+                        { id: 'settings', icon: Settings, label: 'Settings', path: '/settings' },
                     ].map(item => {
                         const isActive = item.id === 'feed' ? view === 'feed' : item.id === view;
                         const inner = (

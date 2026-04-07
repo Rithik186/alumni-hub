@@ -19,8 +19,12 @@ export const updateProfilePicture = async (req, res) => {
             profile_picture: profile_picture_url
         });
     } catch (err) {
-        console.error('Profile Picture Upload Error:', err);
-        res.status(500).json({ message: 'Server error during upload' });
+        console.error('CRITICAL: Profile Picture Upload Error:', err);
+        res.status(500).json({ 
+            message: 'Server error during upload', 
+            error: err.message,
+            stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+        });
     }
 };
 

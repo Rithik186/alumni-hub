@@ -148,28 +148,32 @@ export const getSuggestions = async (req, res) => {
         const userRes = await db.query('SELECT college, role FROM users WHERE id = $1', [userId]);
         const { college, role } = userRes.rows[0];
 
-        let suggestions;
+        let query;
         if (role === 'student') {
-            suggestions = await db.query(`
-                SELECT u.id, u.name, u.college, ap.company, ap.job_role, ap.batch,
-                (SELECT status FROM follows WHERE follower_id = $2 AND following_id = u.id) as follow_status
+            query = `
+                SELECT u.id, u.name, u.college, ap.company, ap.job_role, ap.batch, u.profile_picture as avatar,
+                       f.status as follow_status
                 FROM users u
-                JOIN alumni_profiles ap ON u.id = ap.user_id
+                INNER JOIN alumni_profiles ap ON u.id = ap.user_id
+                LEFT JOIN follows f ON f.follower_id = $2 AND f.following_id = u.id
                 WHERE u.college = $1 AND u.id != $2
-                AND (SELECT status FROM follows WHERE follower_id = $2 AND following_id = u.id) IS NULL
-                LIMIT 10
-            `, [college, userId]);
+                AND f.status IS NULL
+                LIMIT 6
+            `;
         } else {
-            suggestions = await db.query(`
-                SELECT u.id, u.name, u.college, sp.department, sp.batch,
-                (SELECT status FROM follows WHERE follower_id = $2 AND following_id = u.id) as follow_status
+            query = `
+                SELECT u.id, u.name, u.college, sp.department, sp.batch, u.profile_picture as avatar,
+                       f.status as follow_status
                 FROM users u
-                JOIN student_profiles sp ON u.id = sp.user_id
+                INNER JOIN student_profiles sp ON u.id = sp.user_id
+                LEFT JOIN follows f ON f.follower_id = $2 AND f.following_id = u.id
                 WHERE u.college = $1 AND u.id != $2
-                AND (SELECT status FROM follows WHERE follower_id = $2 AND following_id = u.id) IS NULL
-                LIMIT 10
-            `, [college, userId]);
+                AND f.status IS NULL
+                LIMIT 6
+            `;
         }
+        
+        const suggestions = await db.query(query, [college, userId]);
         res.json(suggestions.rows);
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -185,6 +189,10 @@ export const getMyFollowingsStatuses = async (req, res) => {
         result.rows.forEach(r => mapping[r.following_id] = r.status);
         res.json(mapping);
     } catch (err) {
-        res.status(500).json({ message: err.message });
+        console.error('CRITICAL: My Followings Status Error:', err);
+        res.status(500).json({ 
+            message: 'Error fetching following statuses',
+            error: err.message
+        });
     }
 };

@@ -109,3 +109,212 @@ html {
 .workspace-comment-card {
   @apply bg-slate-50 rounded-2xl rounded-tl-sm;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* APPEARANCE SYSTEM - Font Size                                              */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+html.font-small { font-size: 87%; }
+html.font-medium { font-size: 95%; }
+html.font-large { font-size: 108%; }
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* APPEARANCE SYSTEM - Compact Mode                                           */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+html.compact .sd-card,
+html.compact .post-card,
+html.compact .premium-card,
+html.compact .workspace-card {
+  border-radius: 8px;
+}
+html.compact .sd-card > div,
+html.compact .post-card > div {
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+}
+html.compact main {
+  gap: 0.5rem;
+}
+html.compact aside .sticky > * + * {
+  margin-top: 0.5rem;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* APPEARANCE SYSTEM - Dark Mode                                              */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+html.dark {
+  --primary: #e2e8f0;
+  --accent: #818cf8;
+  --bg-main: #0f172a;
+  --card-bg: #1e293b;
+  --card-border: #334155;
+}
+
+html.dark body {
+  background-color: #0f172a;
+  color: #e2e8f0;
+}
+
+/* Dark mode: general backgrounds & text */
+html.dark .min-h-screen {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 60%, #0f172a 100%) !important;
+}
+html.dark .bg-slate-50,
+html.dark .bg-slate-50\/50,
+html.dark .bg-white,
+html.dark .bg-white\/90,
+html.dark .bg-white\/95 {
+  background-color: #1e293b !important;
+}
+html.dark .backdrop-blur-sm {
+  background-color: rgba(30, 41, 59, 0.95) !important;
+}
+
+/* Dark mode: Cards */
+html.dark .sd-card,
+html.dark .post-card,
+html.dark .premium-card,
+html.dark .workspace-card {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+}
+html.dark .sd-card:hover,
+html.dark .post-card:hover {
+  box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.4);
+}
+
+/* Dark mode: Text colors */
+html.dark .text-slate-900,
+html.dark .text-slate-800,
+html.dark .text-slate-700 {
+  color: #e2e8f0 !important;
+}
+html.dark .text-slate-600,
+html.dark .text-slate-500 {
+  color: #94a3b8 !important;
+}
+html.dark .text-slate-400 {
+  color: #64748b !important;
+}
+html.dark h1, html.dark h2, html.dark h3, html.dark h4, html.dark h5 {
+  color: #f1f5f9 !important;
+}
+
+/* Dark mode: Borders */
+html.dark .border-slate-100,
+html.dark .border-slate-200,
+html.dark .border-slate-200\/80,
+html.dark .border-slate-300 {
+  border-color: #334155 !important;
+}
+
+/* Dark mode: Inputs */
+html.dark input,
+html.dark textarea,
+html.dark select {
+  background-color: #0f172a !important;
+  border-color: #334155 !important;
+  color: #e2e8f0 !important;
+}
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+  color: #475569 !important;
+}
+html.dark input:focus,
+html.dark textarea:focus,
+html.dark select:focus {
+  border-color: #6366f1 !important;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15) !important;
+}
+
+/* Dark mode: Hover states */
+html.dark .hover\:bg-slate-50:hover,
+html.dark .hover\:bg-slate-100:hover {
+  background-color: #334155 !important;
+}
+
+/* Dark mode: Buttons */
+html.dark .bg-slate-50,
+html.dark .bg-slate-100 {
+  background-color: #334155 !important;
+}
+html.dark .bg-indigo-50 {
+  background-color: rgba(99, 102, 241, 0.1) !important;
+}
+html.dark .bg-teal-50,
+html.dark .bg-teal-50\/40 {
+  background-color: rgba(20, 184, 166, 0.1) !important;
+}
+html.dark .bg-emerald-50 {
+  background-color: rgba(16, 185, 129, 0.1) !important;
+}
+html.dark .bg-rose-50 {
+  background-color: rgba(244, 63, 94, 0.1) !important;
+}
+html.dark .bg-amber-50 {
+  background-color: rgba(245, 158, 11, 0.1) !important;
+}
+html.dark .bg-purple-50 {
+  background-color: rgba(168, 85, 247, 0.1) !important;
+}
+
+/* Dark mode: Nav active states */
+html.dark .sd-nav-item:hover { background: #334155; }
+html.dark .sd-nav-item.active { background: rgba(99, 102, 241, 0.15); color: #818cf8; }
+html.dark .sd-nav-item.active svg { color: #818cf8; }
+
+/* Dark mode: Sidebar active nav text */
+html.dark .bg-teal-50.text-teal-700,
+html.dark [class*="bg-teal-50"][class*="text-teal-700"] {
+  background-color: rgba(20, 184, 166, 0.1) !important;
+  color: #2dd4bf !important;
+}
+html.dark .bg-indigo-50.text-indigo-700 {
+  background-color: rgba(99, 102, 241, 0.1) !important;
+  color: #818cf8 !important;
+}
+
+/* Dark mode: Scrollbar */
+html.dark .modern-scrollbar::-webkit-scrollbar-thumb { background: #475569; }
+html.dark .modern-scrollbar::-webkit-scrollbar-thumb:hover { background: #64748b; }
+
+/* Dark mode: Bottom mobile nav */
+html.dark .fixed.bottom-0 {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+}
+
+/* Dark mode: Search bar */
+html.dark .sd-card input,
+html.dark .sd-card select {
+  background-color: #0f172a !important;
+  border-color: #334155 !important;
+}
+
+/* Dark mode: Gradient text keep bright */
+html.dark .gradient-text {
+  @apply bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-violet-400;
+}
+
+/* Dark mode: Shadcn Card components used in Alumni Dashboard */
+html.dark [class*="rounded-2xl"][class*="border"][class*="bg-white"] {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+}
+
+/* Dark mode: The settings page specific elements */
+html.dark .bg-white.rounded-2xl {
+  background-color: #1e293b !important;
+}
+
+/* Dark mode - domain filter pills */
+html.dark button[class*="bg-\[#fafdff\]"] {
+  background-color: #1e293b !important;
+  border-color: #475569 !important;
+  color: #94a3b8 !important;
+}
+
+/* Dark mode transitions */
+body, .sd-card, .post-card, .premium-card, .workspace-card,
+input, textarea, select, nav, aside, main, header {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}

@@ -1,88 +1,131 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-    Settings as SettingsIcon, Bell, Lock, Eye, UserCheck, Palette,
-    Download, LogOut, ChevronRight, ToggleRight, Mail, Smartphone,
-    Globe, Save, X, Check, Loader2, Shield, Trash2
+    Settings as SettingsIcon, Bell, Lock, Palette,
+    LogOut, ChevronRight, Save, X, Check, Loader2,
+    Shield, Trash2, Edit3, Eye, EyeOff, Moon, Sun,
+    Monitor, ArrowLeft, User, MessageSquare, Users,
+    Heart, Mail, Smartphone, Globe, Search, Zap
 } from 'lucide-react';
 import { useUser } from '../context/UserContext';
-import { useNavigate } from 'react-router-dom';
+import { useTheme } from '../context/ThemeContext';
+import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
-import FadeContent from '../components/animations/FadeContent';
-import ShinyText from '../components/animations/ShinyText';
-import SpotlightCard from '../components/animations/SpotlightCard';
+import toast from 'react-hot-toast';
 
 const Settings = () => {
     const { user, logout } = useUser();
+    const { updateTheme, updateFontSize, updateCompact } = useTheme();
     const navigate = useNavigate();
-    const [activeTab, setActiveTab] = useState('account');
-    const [loading, setLoading] = useState(false);
-    const [saved, setSaved] = useState(false);
-    const [error, setError] = useState('');
+    const [activeTab, setActiveTab] = useState('notifications');
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+    const [hasChanges, setHasChanges] = useState(false);
 
-    // Account Settings State
-    const [accountSettings, setAccountSettings] = useState({
-        email: user?.email || '',
-        displayName: user?.name || '',
-        phoneNumber: user?.phone_number || '',
-        bio: user?.bio || '',
+    // Settings state - synced with database
+    const [settings, setSettings] = useState({
+        notifications_email: true,
+        notifications_push: true,
+        notifications_posts: true,
+        notifications_connections: true,
+        notifications_messages: true,
+        notifications_digest: true,
+        privacy_visibility: 'public',
+        privacy_messages: 'everyone',
+        privacy_activity: true,
+        privacy_search_index: true,
+        appearance_theme: 'light',
+        appearance_font_size: 'medium',
+        appearance_compact: false,
     });
 
-    // Notification Settings State
-    const [notificationSettings, setNotificationSettings] = useState({
-        emailNotifications: true,
-        pushNotifications: true,
-        newPostNotifications: true,
-        connectionRequests: true,
-        messages: true,
-        weeklyDigest: true,
-    });
+    // Load settings from database on mount
+    useEffect(() => {
+        if (!user) { navigate('/login'); return; }
+        fetchSettings();
+    }, [user]);
 
-    // Privacy Settings State
-    const [privacySettings, setPrivacySettings] = useState({
-        profileVisibility: 'public',
-        allowMessages: 'everyone',
-        showActivity: true,
-        searchEngineIndex: true,
-    });
-
-    // Appearance Settings State
-    const [appearanceSettings, setAppearanceSettings] = useState({
-        theme: 'light',
-        fontSize: 'medium',
-        compactMode: false,
-    });
-
-    const handleAccountChange = (field, value) => {
-        setAccountSettings(prev => ({ ...prev, [field]: value }));
-        setSaved(false);
+    const fetchSettings = async () => {
+        try {
+            const { data } = await axios.get('/api/settings', {
+                headers: { Authorization: `Bearer ${user.token}` }
+            });
+            setSettings({
+                notifications_email: data.notifications_email ?? true,
+                notifications_push: data.notifications_push ?? true,
+                notifications_posts: data.notifications_posts ?? true,
+                notifications_connections: data.notifications_connections ?? true,
+                notifications_messages: data.notifications_messages ?? true,
+                notifications_digest: data.notifications_digest ?? true,
+                privacy_visibility: data.privacy_visibility || 'public',
+                privacy_messages: data.privacy_messages || 'everyone',
+                privacy_activity: data.privacy_activity ?? true,
+                privacy_search_index: data.privacy_search_index ?? true,
+                appearance_theme: data.appearance_theme || 'light',
+                appearance_font_size: data.appearance_font_size || 'medium',
+                appearance_compact: data.appearance_compact ?? false,
+            });
+        } catch (err) {
+            console.error('Failed to load settings:', err);
+            if (err.response) {
+                console.error('Server error data:', err.response.data);
+            }
+        } finally {
+            setLoading(false);
+        }
     };
 
-    const handleNotificationChange = (field) => {
-        setNotificationSettings(prev => ({ ...prev, [field]: !prev[field] }));
-        setSaved(false);
-    };
-
-    const handlePrivacyChange = (field, value) => {
-        setPrivacySettings(prev => ({ ...prev, [field]: value }));
-        setSaved(false);
-    };
-
-    const handleAppearanceChange = (field, value) => {
-        setAppearanceSettings(prev => ({ ...prev, [field]: value }));
-        setSaved(false);
+    const updateSetting = (key, value) => {
+        setSettings(prev => ({ ...prev, [key]: value }));
+        setHasChanges(true);
     };
 
     const saveSettings = async () => {
-        setLoading(true);
-        setError('');
+        setSaving(true);
         try {
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            setSaved(true);
-            setTimeout(() => setSaved(false), 3000);
+            await axios.put('/api/settings', settings, {
+                headers: { Authorization: `Bearer ${user.token}` }
+            });
+            setHasChanges(false);
+            toast.success('Settings saved successfully');
         } catch (err) {
-            setError('Failed to save settings. Please try again.');
+            toast.error('Failed to save settings');
         } finally {
-            setLoading(false);
+            setSaving(false);
+        }
+    };
+
+    // Auto-save when toggling any setting (instant feedback)
+    const toggleAndSave = async (key) => {
+        const newValue = !settings[key];
+        const newSettings = { ...settings, [key]: newValue };
+        setSettings(newSettings);
+        // Apply visual changes immediately for appearance settings
+        if (key === 'appearance_compact') updateCompact(newValue);
+        try {
+            await axios.put('/api/settings', newSettings, {
+                headers: { Authorization: `Bearer ${user.token}` }
+            });
+            toast.success('Updated', { duration: 1500 });
+        } catch {
+            toast.error('Failed to update');
+            setSettings(prev => ({ ...prev, [key]: !newValue })); // revert
+            if (key === 'appearance_compact') updateCompact(!newValue);
+        }
+    };
+
+    const selectAndSave = async (key, value) => {
+        const newSettings = { ...settings, [key]: value };
+        setSettings(newSettings);
+        // Apply visual changes immediately for appearance settings
+        if (key === 'appearance_theme') updateTheme(value);
+        if (key === 'appearance_font_size') updateFontSize(value);
+        try {
+            await axios.put('/api/settings', newSettings, {
+                headers: { Authorization: `Bearer ${user.token}` }
+            });
+            toast.success('Updated', { duration: 1500 });
+        } catch {
+            toast.error('Failed to update');
         }
     };
 
@@ -93,315 +136,399 @@ const Settings = () => {
         }
     };
 
-    const SettingToggle = ({ label, description, value, onChange }) => (
-        <div className="flex items-center justify-between p-4 border-b border-slate-100 last:border-b-0 hover:bg-slate-50/50 transition-colors rounded-lg">
-            <div className="flex-1">
-                <p className="font-semibold text-slate-800 text-sm">{label}</p>
-                {description && <p className="text-xs text-slate-500 mt-0.5">{description}</p>}
+    const handleDeleteAccount = async () => {
+        const confirmed = window.confirm(
+            'Are you sure you want to PERMANENTLY delete your account? This cannot be undone.'
+        );
+        if (!confirmed) return;
+        const doubleConfirm = window.confirm(
+            'This will delete ALL your data including posts, connections, and messages. Continue?'
+        );
+        if (!doubleConfirm) return;
+
+        try {
+            await axios.delete('/api/settings/account', {
+                headers: { Authorization: `Bearer ${user.token}` }
+            });
+            toast.success('Account deleted');
+            await logout();
+            navigate('/');
+        } catch {
+            toast.error('Failed to delete account');
+        }
+    };
+
+    // Reusable Toggle Component
+    const Toggle = ({ label, description, value, onToggle, icon: Icon }) => (
+        <div className="flex items-center justify-between py-4 px-1 group">
+            <div className="flex items-start gap-3 flex-1 mr-4">
+                {Icon && (
+                    <div className="w-9 h-9 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center flex-shrink-0 mt-0.5 group-hover:bg-indigo-50 group-hover:border-indigo-100 transition-all">
+                        <Icon className="w-4 h-4 text-slate-400 group-hover:text-indigo-500 transition-colors" />
+                    </div>
+                )}
+                <div>
+                    <p className="text-sm font-semibold text-slate-800">{label}</p>
+                    {description && <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">{description}</p>}
+                </div>
             </div>
             <button
-                onClick={onChange}
-                className={`relative w-11 h-6 rounded-full transition-all duration-300 ${
-                    value ? 'bg-teal-500' : 'bg-slate-300'
+                onClick={onToggle}
+                className={`relative w-12 h-7 rounded-full transition-all duration-300 flex-shrink-0 ${
+                    value ? 'bg-indigo-500' : 'bg-slate-200'
                 }`}
             >
-                <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-all duration-300 ${
-                    value ? 'left-[22px]' : 'left-0.5'
+                <span className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow-md transition-all duration-300 ${
+                    value ? 'left-[26px]' : 'left-1'
                 }`} />
             </button>
         </div>
     );
 
-    const SettingSelect = ({ label, description, value, options, onChange }) => (
-        <div className="p-4 border-b border-slate-100 last:border-b-0 hover:bg-slate-50/50 transition-colors rounded-lg">
-            <p className="font-semibold text-slate-800 text-sm mb-1">{label}</p>
-            {description && <p className="text-xs text-slate-500 mb-2.5">{description}</p>}
-            <select
-                value={value}
-                onChange={onChange}
-                className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-400 transition-all"
-            >
+    // Reusable Select Component
+    const SelectOption = ({ label, description, value, options, onChange, icon: Icon }) => (
+        <div className="py-4 px-1 group">
+            <div className="flex items-start gap-3 mb-3">
+                {Icon && (
+                    <div className="w-9 h-9 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center flex-shrink-0 group-hover:bg-indigo-50 group-hover:border-indigo-100 transition-all">
+                        <Icon className="w-4 h-4 text-slate-400 group-hover:text-indigo-500 transition-colors" />
+                    </div>
+                )}
+                <div>
+                    <p className="text-sm font-semibold text-slate-800">{label}</p>
+                    {description && <p className="text-xs text-slate-400 mt-0.5">{description}</p>}
+                </div>
+            </div>
+            <div className={`grid grid-cols-${options.length} gap-2 ${Icon ? 'ml-12' : ''}`}>
                 {options.map(opt => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    <button
+                        key={opt.value}
+                        onClick={() => onChange(opt.value)}
+                        className={`px-4 py-2.5 rounded-xl text-xs font-semibold transition-all border ${
+                            value === opt.value
+                                ? 'bg-indigo-50 text-indigo-600 border-indigo-200 shadow-sm'
+                                : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50 hover:text-slate-700'
+                        }`}
+                    >
+                        {opt.icon && <opt.icon className="w-3.5 h-3.5 mx-auto mb-1" />}
+                        {opt.label}
+                    </button>
                 ))}
-            </select>
-        </div>
-    );
-
-    const SettingInput = ({ label, description, type = 'text', value, onChange }) => (
-        <div className="p-4 border-b border-slate-100 last:border-b-0 hover:bg-slate-50/50 transition-colors rounded-lg">
-            <p className="font-semibold text-slate-800 text-sm mb-1">{label}</p>
-            {description && <p className="text-xs text-slate-500 mb-2.5">{description}</p>}
-            <input
-                type={type}
-                value={value}
-                onChange={onChange}
-                className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-400 transition-all"
-            />
+            </div>
         </div>
     );
 
     const tabItems = [
-        { id: 'account', label: 'Account', icon: UserCheck },
-        { id: 'notifications', label: 'Notifications', icon: Bell },
-        { id: 'privacy', label: 'Privacy', icon: Lock },
-        { id: 'appearance', label: 'Appearance', icon: Palette },
+        { id: 'notifications', label: 'Notifications', icon: Bell, desc: 'Email, push & alerts' },
+        { id: 'privacy', label: 'Privacy & Security', icon: Lock, desc: 'Visibility & messaging' },
+        { id: 'appearance', label: 'Appearance', icon: Palette, desc: 'Theme & display' },
     ];
 
-    const SaveButton = () => (
-        <button
-            onClick={saveSettings}
-            disabled={loading}
-            className="flex items-center gap-2 px-6 py-2.5 bg-teal-600 text-white font-semibold rounded-xl hover:bg-teal-700 transition-all disabled:opacity-50 shadow-sm text-sm"
-        >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-            {loading ? 'Saving...' : 'Save Changes'}
-        </button>
+    if (loading) return (
+        <div className="min-h-screen bg-slate-50">
+            <div className="flex items-center justify-center pt-40">
+                <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
+            </div>
+        </div>
     );
 
     return (
-        <div className="min-h-screen" style={{ background: 'linear-gradient(135deg, #f4faf8 0%, #e2eeeb 60%, #dae8e4 100%)' }}>
-            <div className="max-w-6xl mx-auto px-4 py-8">
+        <div className="min-h-screen bg-slate-50/50">
+
+            <main className="max-w-5xl mx-auto px-4 sm:px-6 pt-8 pb-20">
                 {/* Header */}
-                <FadeContent blur duration={600}>
-                    <div className="mb-8">
-                        <div className="flex items-center gap-3 mb-2">
-                            <div className="w-10 h-10 rounded-xl bg-teal-100 flex items-center justify-center">
-                                <SettingsIcon className="w-5 h-5 text-teal-600" />
-                            </div>
-                            <div>
-                                <h1 className="text-2xl font-bold text-slate-900">
-                                    Settings
-                                </h1>
-                                <p className="text-sm text-slate-500">Manage your account, privacy, and preferences</p>
-                            </div>
+                <div className="flex items-center justify-between mb-8">
+                    <div className="flex items-center gap-4">
+                        <Link to="/dashboard" className="p-2 bg-white border border-slate-200 rounded-xl text-slate-400 hover:text-slate-600 hover:border-slate-300 transition-all">
+                            <ArrowLeft className="w-4 h-4" />
+                        </Link>
+                        <div>
+                            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Settings</h1>
+                            <p className="text-sm text-slate-400 mt-0.5">Manage your preferences and privacy</p>
                         </div>
                     </div>
-                </FadeContent>
-
-                {/* Success Message */}
-                {saved && (
-                    <FadeContent duration={300}>
-                        <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-2 shadow-sm">
-                            <Check className="w-5 h-5 text-emerald-600" />
-                            <p className="text-sm font-medium text-emerald-700">Settings saved successfully!</p>
-                        </div>
-                    </FadeContent>
-                )}
-
-                {/* Error Message */}
-                {error && (
-                    <div className="mb-6 p-4 bg-rose-50 border border-rose-200 rounded-xl flex items-center gap-2 shadow-sm">
-                        <X className="w-5 h-5 text-rose-600" />
-                        <p className="text-sm font-medium text-rose-700">{error}</p>
-                    </div>
-                )}
+                    <Link
+                        to="/profile/edit"
+                        className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-all shadow-sm"
+                    >
+                        <Edit3 className="w-4 h-4" /> Edit Profile
+                    </Link>
+                </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                    {/* Sidebar Navigation */}
-                    <FadeContent blur duration={600} delay={100}>
-                        <aside className="lg:col-span-1">
-                            <nav className="bg-white/90 backdrop-blur-sm rounded-2xl border border-slate-200/80 overflow-hidden sticky top-8 shadow-sm">
-                                {tabItems.map((tab, i) => (
+                    {/* Sidebar */}
+                    <aside className="lg:col-span-1">
+                        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm sticky top-24">
+                            <nav className="p-2">
+                                {tabItems.map(tab => (
                                     <button
                                         key={tab.id}
                                         onClick={() => setActiveTab(tab.id)}
-                                        className={`w-full flex items-center gap-3 px-4 py-3.5 border-b border-slate-100/80 last:border-b-0 transition-all ${
+                                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all mb-0.5 ${
                                             activeTab === tab.id
-                                                ? 'bg-teal-50 text-teal-700 border-l-[3px] border-l-teal-500 font-semibold'
-                                                : 'text-slate-600 hover:bg-slate-50'
+                                                ? 'bg-indigo-50 text-indigo-700'
+                                                : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
                                         }`}
                                     >
-                                        <tab.icon className={`w-[18px] h-[18px] ${activeTab === tab.id ? 'text-teal-600' : 'text-slate-400'}`} />
-                                        <span className="text-sm">{tab.label}</span>
-                                        <ChevronRight className={`w-3.5 h-3.5 ml-auto transition-transform ${activeTab === tab.id ? 'text-teal-500 translate-x-0.5' : 'text-slate-300'}`} />
+                                        <tab.icon className={`w-[18px] h-[18px] flex-shrink-0 ${
+                                            activeTab === tab.id ? 'text-indigo-600' : 'text-slate-400'
+                                        }`} />
+                                        <div className="text-left flex-1 min-w-0">
+                                            <p className={`text-sm truncate ${activeTab === tab.id ? 'font-bold' : 'font-medium'}`}>{tab.label}</p>
+                                            <p className="text-[10px] text-slate-400 truncate">{tab.desc}</p>
+                                        </div>
+                                        <ChevronRight className={`w-3.5 h-3.5 flex-shrink-0 transition-transform ${
+                                            activeTab === tab.id ? 'text-indigo-500 translate-x-0.5' : 'text-slate-300'
+                                        }`} />
                                     </button>
                                 ))}
-                                <div className="border-t border-slate-200/80">
-                                    <button
-                                        onClick={handleLogout}
-                                        className="w-full flex items-center gap-3 px-4 py-3.5 text-rose-600 hover:bg-rose-50 transition-all font-medium text-sm"
-                                    >
-                                        <LogOut className="w-[18px] h-[18px]" />
-                                        <span>Logout</span>
-                                    </button>
-                                </div>
                             </nav>
-                        </aside>
-                    </FadeContent>
+
+                            <div className="border-t border-slate-100 p-2">
+                                <button
+                                    onClick={handleLogout}
+                                    className="w-full flex items-center gap-3 px-4 py-3 text-rose-600 hover:bg-rose-50 rounded-xl transition-all text-sm font-medium"
+                                >
+                                    <LogOut className="w-[18px] h-[18px]" />
+                                    <span>Logout</span>
+                                </button>
+                            </div>
+                        </div>
+                    </aside>
 
                     {/* Main Content */}
                     <main className="lg:col-span-3 space-y-6">
-                        {/* Account Settings */}
-                        {activeTab === 'account' && (
-                            <FadeContent blur duration={500}>
-                                <SpotlightCard className="bg-white/90 backdrop-blur-sm rounded-2xl border border-slate-200/80 p-6 shadow-sm" spotlightColor="rgba(20, 184, 166, 0.08)">
-                                    <div className="flex items-center gap-2.5 mb-6">
-                                        <div className="w-8 h-8 rounded-lg bg-teal-50 flex items-center justify-center">
-                                            <UserCheck className="w-4 h-4 text-teal-600" />
-                                        </div>
-                                        <h2 className="text-lg font-bold text-slate-900">Account Settings</h2>
-                                    </div>
-                                    <div className="space-y-1">
-                                        <SettingInput label="Display Name" description="Your public profile name" value={accountSettings.displayName} onChange={e => handleAccountChange('displayName', e.target.value)} />
-                                        <SettingInput label="Email Address" type="email" description="Your primary email address" value={accountSettings.email} onChange={e => handleAccountChange('email', e.target.value)} />
-                                        <SettingInput label="Phone Number" type="tel" description="Optional phone number" value={accountSettings.phoneNumber} onChange={e => handleAccountChange('phoneNumber', e.target.value)} />
-                                        <div className="p-4 hover:bg-slate-50/50 transition-colors rounded-lg">
-                                            <p className="font-semibold text-slate-800 text-sm mb-1">Bio</p>
-                                            <p className="text-xs text-slate-500 mb-2.5">Tell others about yourself</p>
-                                            <textarea
-                                                value={accountSettings.bio}
-                                                onChange={e => handleAccountChange('bio', e.target.value)}
-                                                rows={4}
-                                                placeholder="Share your professional background, interests, or expertise..."
-                                                className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-400 resize-none transition-all"
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="flex gap-3 mt-6 pt-6 border-t border-slate-100">
-                                        <SaveButton />
-                                    </div>
-                                </SpotlightCard>
-                            </FadeContent>
-                        )}
 
-                        {/* Notification Settings */}
+                        {/* Notifications Tab */}
                         {activeTab === 'notifications' && (
-                            <FadeContent blur duration={500}>
-                                <SpotlightCard className="bg-white/90 backdrop-blur-sm rounded-2xl border border-slate-200/80 overflow-hidden shadow-sm" spotlightColor="rgba(20, 184, 166, 0.08)">
-                                    <div className="p-6 border-b border-slate-100">
-                                        <div className="flex items-center gap-2.5">
-                                            <div className="w-8 h-8 rounded-lg bg-teal-50 flex items-center justify-center">
-                                                <Bell className="w-4 h-4 text-teal-600" />
-                                            </div>
+                            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                                <div className="p-6 border-b border-slate-100">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center">
+                                            <Bell className="w-5 h-5 text-indigo-600" />
+                                        </div>
+                                        <div>
                                             <h2 className="text-lg font-bold text-slate-900">Notification Preferences</h2>
+                                            <p className="text-xs text-slate-400">Choose what alerts you want to receive</p>
                                         </div>
                                     </div>
-                                    <div className="p-4 space-y-1">
-                                        <SettingToggle label="Email Notifications" description="Receive updates via email" value={notificationSettings.emailNotifications} onChange={() => handleNotificationChange('emailNotifications')} />
-                                        <SettingToggle label="Push Notifications" description="Get browser and mobile push alerts" value={notificationSettings.pushNotifications} onChange={() => handleNotificationChange('pushNotifications')} />
-                                        <SettingToggle label="New Post Notifications" description="Alerts when followed users post" value={notificationSettings.newPostNotifications} onChange={() => handleNotificationChange('newPostNotifications')} />
-                                        <SettingToggle label="Connection Requests" description="Notify me about new connection requests" value={notificationSettings.connectionRequests} onChange={() => handleNotificationChange('connectionRequests')} />
-                                        <SettingToggle label="Messages" description="Alerts for new messages" value={notificationSettings.messages} onChange={() => handleNotificationChange('messages')} />
-                                        <SettingToggle label="Weekly Digest" description="Summary of network activity" value={notificationSettings.weeklyDigest} onChange={() => handleNotificationChange('weeklyDigest')} />
-                                    </div>
-                                    <div className="p-6 border-t border-slate-100 flex gap-3">
-                                        <SaveButton />
-                                    </div>
-                                </SpotlightCard>
-                            </FadeContent>
+                                </div>
+                                <div className="px-6 divide-y divide-slate-100">
+                                    <Toggle
+                                        icon={Mail}
+                                        label="Email Notifications"
+                                        description="Receive updates and alerts via your email address"
+                                        value={settings.notifications_email}
+                                        onToggle={() => toggleAndSave('notifications_email')}
+                                    />
+                                    <Toggle
+                                        icon={Smartphone}
+                                        label="Push Notifications"
+                                        description="Get browser and mobile push alerts"
+                                        value={settings.notifications_push}
+                                        onToggle={() => toggleAndSave('notifications_push')}
+                                    />
+                                    <Toggle
+                                        icon={Heart}
+                                        label="Post Activity"
+                                        description="Get notified when someone likes or comments on your posts"
+                                        value={settings.notifications_posts}
+                                        onToggle={() => toggleAndSave('notifications_posts')}
+                                    />
+                                    <Toggle
+                                        icon={Users}
+                                        label="Connection Requests"
+                                        description="Get notified about new connection requests"
+                                        value={settings.notifications_connections}
+                                        onToggle={() => toggleAndSave('notifications_connections')}
+                                    />
+                                    <Toggle
+                                        icon={MessageSquare}
+                                        label="Messages"
+                                        description="Receive alerts when you get new messages"
+                                        value={settings.notifications_messages}
+                                        onToggle={() => toggleAndSave('notifications_messages')}
+                                    />
+                                    <Toggle
+                                        icon={Zap}
+                                        label="Weekly Digest"
+                                        description="Get a weekly summary of your network activity"
+                                        value={settings.notifications_digest}
+                                        onToggle={() => toggleAndSave('notifications_digest')}
+                                    />
+                                </div>
+                            </div>
                         )}
 
-                        {/* Privacy Settings */}
+                        {/* Privacy Tab */}
                         {activeTab === 'privacy' && (
-                            <FadeContent blur duration={500}>
-                                <SpotlightCard className="bg-white/90 backdrop-blur-sm rounded-2xl border border-slate-200/80 overflow-hidden shadow-sm" spotlightColor="rgba(20, 184, 166, 0.08)">
+                            <div className="space-y-6">
+                                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                                     <div className="p-6 border-b border-slate-100">
-                                        <div className="flex items-center gap-2.5">
-                                            <div className="w-8 h-8 rounded-lg bg-teal-50 flex items-center justify-center">
-                                                <Lock className="w-4 h-4 text-teal-600" />
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center">
+                                                <Lock className="w-5 h-5 text-indigo-600" />
                                             </div>
-                                            <h2 className="text-lg font-bold text-slate-900">Privacy & Security</h2>
-                                        </div>
-                                    </div>
-                                    <div className="p-4 space-y-1">
-                                        <SettingSelect label="Profile Visibility" description="Who can see your profile?" value={privacySettings.profileVisibility} options={[
-                                            { value: 'public', label: 'Public - Everyone' },
-                                            { value: 'connections', label: 'Connections Only' },
-                                            { value: 'private', label: 'Private - No one' },
-                                        ]} onChange={e => handlePrivacyChange('profileVisibility', e.target.value)} />
-                                        <SettingSelect label="Allow Messages" description="Who can message you?" value={privacySettings.allowMessages} options={[
-                                            { value: 'everyone', label: 'Everyone' },
-                                            { value: 'connections', label: 'Connections Only' },
-                                            { value: 'none', label: 'No one' },
-                                        ]} onChange={e => handlePrivacyChange('allowMessages', e.target.value)} />
-                                        <SettingToggle label="Show Activity Status" description="Let others see when you're online" value={privacySettings.showActivity} onChange={() => handlePrivacyChange('showActivity', !privacySettings.showActivity)} />
-                                        <SettingToggle label="Search Engine Indexing" description="Allow search engines to index your profile" value={privacySettings.searchEngineIndex} onChange={() => handlePrivacyChange('searchEngineIndex', !privacySettings.searchEngineIndex)} />
-                                    </div>
-                                    <div className="p-6 border-t border-slate-100">
-                                        <div className="mb-4 p-4 bg-teal-50/60 border border-teal-200/60 rounded-xl">
-                                            <div className="flex items-center gap-2 mb-2">
-                                                <Shield className="w-4 h-4 text-teal-600" />
-                                                <p className="text-sm text-teal-900 font-semibold">Two-Factor Authentication</p>
+                                            <div>
+                                                <h2 className="text-lg font-bold text-slate-900">Privacy & Security</h2>
+                                                <p className="text-xs text-slate-400">Control who can see your profile and send you messages</p>
                                             </div>
-                                            <p className="text-xs text-teal-700 mb-3 pl-6">Add an extra layer of security to your account</p>
-                                            <button className="px-4 py-2 bg-teal-600 text-white text-sm font-semibold rounded-xl hover:bg-teal-700 transition-all ml-6 shadow-sm">
-                                                Enable 2FA
-                                            </button>
-                                        </div>
-                                        <div className="flex gap-3 pt-4">
-                                            <SaveButton />
                                         </div>
                                     </div>
-                                </SpotlightCard>
-                            </FadeContent>
+                                    <div className="px-6 divide-y divide-slate-100">
+                                        <SelectOption
+                                            icon={Eye}
+                                            label="Profile Visibility"
+                                            description="Who can view your profile?"
+                                            value={settings.privacy_visibility}
+                                            options={[
+                                                { value: 'public', label: 'Everyone' },
+                                                { value: 'connections', label: 'Connections Only' },
+                                                { value: 'private', label: 'Private' },
+                                            ]}
+                                            onChange={(val) => selectAndSave('privacy_visibility', val)}
+                                        />
+                                        <SelectOption
+                                            icon={MessageSquare}
+                                            label="Allow Messages From"
+                                            description="Who can send you direct messages?"
+                                            value={settings.privacy_messages}
+                                            options={[
+                                                { value: 'everyone', label: 'Everyone' },
+                                                { value: 'connections', label: 'Connections Only' },
+                                                { value: 'none', label: 'No one' },
+                                            ]}
+                                            onChange={(val) => selectAndSave('privacy_messages', val)}
+                                        />
+                                        <Toggle
+                                            icon={Globe}
+                                            label="Show Activity Status"
+                                            description="Let others see when you're online"
+                                            value={settings.privacy_activity}
+                                            onToggle={() => toggleAndSave('privacy_activity')}
+                                        />
+                                        <Toggle
+                                            icon={Search}
+                                            label="Search Engine Indexing"
+                                            description="Allow search engines to find your profile"
+                                            value={settings.privacy_search_index}
+                                            onToggle={() => toggleAndSave('privacy_search_index')}
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Danger Zone */}
+                                <div className="bg-white rounded-2xl border border-rose-200 shadow-sm overflow-hidden">
+                                    <div className="p-6 border-b border-rose-100">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-xl bg-rose-50 flex items-center justify-center">
+                                                <Trash2 className="w-5 h-5 text-rose-500" />
+                                            </div>
+                                            <div>
+                                                <h2 className="text-lg font-bold text-rose-700">Danger Zone</h2>
+                                                <p className="text-xs text-rose-400">Irreversible actions</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="p-6">
+                                        <p className="text-sm text-slate-600 mb-4">
+                                            Deleting your account will permanently remove all your data, posts, connections, and messages. This action <strong>cannot be undone</strong>.
+                                        </p>
+                                        <button
+                                            onClick={handleDeleteAccount}
+                                            className="px-5 py-2.5 bg-rose-500 text-white text-sm font-semibold rounded-xl hover:bg-rose-600 transition-all shadow-sm"
+                                        >
+                                            Delete My Account
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
                         )}
 
-                        {/* Appearance Settings */}
+                        {/* Appearance Tab */}
                         {activeTab === 'appearance' && (
-                            <FadeContent blur duration={500}>
-                                <SpotlightCard className="bg-white/90 backdrop-blur-sm rounded-2xl border border-slate-200/80 overflow-hidden shadow-sm" spotlightColor="rgba(20, 184, 166, 0.08)">
-                                    <div className="p-6 border-b border-slate-100">
-                                        <div className="flex items-center gap-2.5">
-                                            <div className="w-8 h-8 rounded-lg bg-teal-50 flex items-center justify-center">
-                                                <Palette className="w-4 h-4 text-teal-600" />
-                                            </div>
+                            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                                <div className="p-6 border-b border-slate-100">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center">
+                                            <Palette className="w-5 h-5 text-indigo-600" />
+                                        </div>
+                                        <div>
                                             <h2 className="text-lg font-bold text-slate-900">Appearance</h2>
+                                            <p className="text-xs text-slate-400">Customize how the app looks for you</p>
                                         </div>
                                     </div>
-                                    <div className="p-4 space-y-1">
-                                        <SettingSelect label="Theme" description="Choose your preferred theme" value={appearanceSettings.theme} options={[
-                                            { value: 'light', label: 'Light' },
-                                            { value: 'dark', label: 'Dark' },
-                                            { value: 'auto', label: 'System Default' },
-                                        ]} onChange={e => handleAppearanceChange('theme', e.target.value)} />
-                                        <SettingSelect label="Font Size" description="Adjust text size throughout the app" value={appearanceSettings.fontSize} options={[
-                                            { value: 'small', label: 'Small' },
-                                            { value: 'medium', label: 'Medium (Default)' },
-                                            { value: 'large', label: 'Large' },
-                                        ]} onChange={e => handleAppearanceChange('fontSize', e.target.value)} />
-                                        <SettingToggle label="Compact Mode" description="Reduce spacing and padding in the interface" value={appearanceSettings.compactMode} onChange={() => handleAppearanceChange('compactMode', !appearanceSettings.compactMode)} />
+                                </div>
+                                <div className="px-6 divide-y divide-slate-100">
+                                    {/* Theme Selection */}
+                                    <div className="py-6">
+                                        <p className="text-sm font-semibold text-slate-800 mb-1">Theme</p>
+                                        <p className="text-xs text-slate-400 mb-4">Choose your preferred color scheme</p>
+                                        <div className="grid grid-cols-3 gap-3">
+                                            {[
+                                                { value: 'light', label: 'Light', icon: Sun, bg: 'bg-white', border: 'border-slate-200', text: 'text-slate-900' },
+                                                { value: 'dark', label: 'Dark', icon: Moon, bg: 'bg-slate-900', border: 'border-slate-700', text: 'text-white' },
+                                                { value: 'auto', label: 'System', icon: Monitor, bg: 'bg-gradient-to-r from-white to-slate-900', border: 'border-slate-300', text: 'text-slate-600' },
+                                            ].map(theme => (
+                                                <button
+                                                    key={theme.value}
+                                                    onClick={() => selectAndSave('appearance_theme', theme.value)}
+                                                    className={`rounded-2xl border-2 p-4 transition-all text-center ${
+                                                        settings.appearance_theme === theme.value
+                                                            ? 'border-indigo-500 shadow-md shadow-indigo-100'
+                                                            : 'border-slate-200 hover:border-slate-300'
+                                                    }`}
+                                                >
+                                                    <div className={`w-12 h-8 ${theme.bg} ${theme.border} border rounded-lg mx-auto mb-3`} />
+                                                    <theme.icon className={`w-4 h-4 mx-auto mb-1.5 ${
+                                                        settings.appearance_theme === theme.value ? 'text-indigo-600' : 'text-slate-400'
+                                                    }`} />
+                                                    <p className={`text-xs font-semibold ${
+                                                        settings.appearance_theme === theme.value ? 'text-indigo-600' : 'text-slate-500'
+                                                    }`}>{theme.label}</p>
+                                                </button>
+                                            ))}
+                                        </div>
                                     </div>
-                                    <div className="p-6 border-t border-slate-100 flex gap-3">
-                                        <SaveButton />
+
+                                    {/* Font Size */}
+                                    <div className="py-6">
+                                        <p className="text-sm font-semibold text-slate-800 mb-1">Font Size</p>
+                                        <p className="text-xs text-slate-400 mb-4">Adjust text size throughout the app</p>
+                                        <div className="flex items-center gap-3 bg-slate-50 rounded-2xl p-2 border border-slate-100">
+                                            {[
+                                                { value: 'small', label: 'Small', size: 'text-xs' },
+                                                { value: 'medium', label: 'Medium', size: 'text-sm' },
+                                                { value: 'large', label: 'Large', size: 'text-base' },
+                                            ].map(fs => (
+                                                <button
+                                                    key={fs.value}
+                                                    onClick={() => selectAndSave('appearance_font_size', fs.value)}
+                                                    className={`flex-1 py-2.5 rounded-xl ${fs.size} font-semibold transition-all ${
+                                                        settings.appearance_font_size === fs.value
+                                                            ? 'bg-white text-indigo-600 shadow-sm border border-indigo-100'
+                                                            : 'text-slate-500 hover:text-slate-700'
+                                                    }`}
+                                                >
+                                                    {fs.label}
+                                                </button>
+                                            ))}
+                                        </div>
                                     </div>
-                                </SpotlightCard>
-                            </FadeContent>
+
+                                    {/* Compact Mode */}
+                                    <Toggle
+                                        label="Compact Mode"
+                                        description="Reduce spacing and padding for a denser interface"
+                                        value={settings.appearance_compact}
+                                        onToggle={() => toggleAndSave('appearance_compact')}
+                                    />
+                                </div>
+                            </div>
                         )}
                     </main>
                 </div>
-
-                {/* Additional Options */}
-                <FadeContent blur duration={800} delay={200}>
-                    <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <SpotlightCard className="bg-white/90 backdrop-blur-sm rounded-2xl border border-slate-200/80 p-6 shadow-sm" spotlightColor="rgba(20, 184, 166, 0.08)">
-                            <div className="flex items-center gap-2.5 mb-3">
-                                <div className="w-8 h-8 rounded-lg bg-teal-50 flex items-center justify-center">
-                                    <Download className="w-4 h-4 text-teal-600" />
-                                </div>
-                                <h3 className="font-bold text-slate-900 text-sm">Download Your Data</h3>
-                            </div>
-                            <p className="text-xs text-slate-500 mb-4 pl-[42px]">Request a copy of your personal data in a portable format</p>
-                            <button className="ml-[42px] px-4 py-2 border border-teal-300 text-teal-700 font-semibold rounded-xl hover:bg-teal-50 transition-all text-sm">
-                                Request Export
-                            </button>
-                        </SpotlightCard>
-
-                        <SpotlightCard className="bg-white/90 backdrop-blur-sm rounded-2xl border border-slate-200/80 p-6 shadow-sm" spotlightColor="rgba(244, 63, 94, 0.08)">
-                            <div className="flex items-center gap-2.5 mb-3">
-                                <div className="w-8 h-8 rounded-lg bg-rose-50 flex items-center justify-center">
-                                    <Trash2 className="w-4 h-4 text-rose-500" />
-                                </div>
-                                <h3 className="font-bold text-slate-900 text-sm">Delete Account</h3>
-                            </div>
-                            <p className="text-xs text-slate-500 mb-4 pl-[42px]">Permanently delete your account and all associated data</p>
-                            <button className="ml-[42px] px-4 py-2 bg-rose-500 text-white font-semibold rounded-xl hover:bg-rose-600 transition-all text-sm shadow-sm">
-                                Delete Account
-                            </button>
-                        </SpotlightCard>
-                    </div>
-                </FadeContent>
-            </div>
+            </main>
         </div>
     );
 };

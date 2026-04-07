@@ -1,27 +1,35 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-    ShieldCheck, Users, Clock, CheckCircle, XCircle,
-    BarChart3, Search, Plus, Zap, Calendar, Trash2, X,
-    Megaphone, Sparkles, UserX, UserCheck, Shield,
-    GraduationCap, Briefcase, Filter, MoreHorizontal,
-    Activity, ArrowUpRight, Lock, Unlock, Settings
+    Users, Clock, CheckCircle, XCircle,
+    Search, Plus, Calendar, Trash2, X,
+    Megaphone, UserCheck, Shield,
+    GraduationCap, Briefcase, Filter,
+    Activity, Edit2, UserPlus, Mail,
+    Building2, MoreVertical, Check, AlertCircle,
+    LayoutDashboard, UserCircle, Settings, LogOut
 } from 'lucide-react';
 import { useUser } from '../../context/UserContext';
 import axios from 'axios';
+import { toast } from 'react-hot-toast';
 
 const AdminDashboard = () => {
     const { user } = useUser();
     const queryClient = useQueryClient();
-    const [search, setSearch] = useState('');
-    const [memberSearch, setMemberSearch] = useState('');
+    const [activeTab, setActiveTab] = useState('overview'); // overview, pending, students, alumni, events
+    const [searchQuery, setSearchQuery] = useState('');
+    const [isUserModalOpen, setIsUserModalOpen] = useState(false);
     const [isEventModalOpen, setIsEventModalOpen] = useState(false);
-    const [newEvent, setNewEvent] = useState({ title: '', description: '', date: '', type: 'general' });
+    const [editingUser, setEditingUser] = useState(null);
+    
+    // Form States
+    const [userForm, setUserForm] = useState({ name: '', email: '', password: '', role: 'student', college: '' });
+    const [eventForm, setEventForm] = useState({ title: '', description: '', date: '', type: 'general' });
 
-    // Global High-Frequency Sync (5s Polling for Admin)
-    const { data: adminData, isLoading, isFetching } = useQuery({
-        queryKey: ['adminControlPanel'],
+    // Fetch All Admin Data
+    const { data: adminData, isLoading, isError, refetch } = useQuery({
+        queryKey: ['adminDashboardData'],
         queryFn: async () => {
             const [stats, pending, users, events] = await Promise.all([
                 axios.get('/api/admin/stats', { headers: { 'Authorization': `Bearer ${user.token}` } }),
@@ -36,274 +44,510 @@ const AdminDashboard = () => {
                 events: events.data
             };
         },
-        staleTime: 30000,
-        refetchInterval: 30000
+        staleTime: 5000,
+        refetchInterval: 10000 // Refresh every 10 seconds for real-time feel
     });
 
-    const approvalMutation = useMutation({
+    // Mutations for immediate UI feedback
+    const approveMutation = useMutation({
         mutationFn: async ({ userId, status }) => {
             return axios.post('/api/admin/update-approval', { userId, status }, { headers: { 'Authorization': `Bearer ${user.token}` } });
         },
-        onSuccess: () => queryClient.invalidateQueries(['adminControlPanel'])
+        onSuccess: () => {
+            queryClient.invalidateQueries(['adminDashboardData']);
+            toast.success('Account approval status updated');
+        },
+        onError: () => toast.error('Failed to update status')
     });
 
-    const toggleUserStatusMutation = useMutation({
+    const toggleStatusMutation = useMutation({
         mutationFn: async (userId) => {
             return axios.patch(`/api/admin/users/${userId}/toggle-status`, {}, { headers: { 'Authorization': `Bearer ${user.token}` } });
         },
-        onSuccess: () => queryClient.invalidateQueries(['adminControlPanel'])
+        onSuccess: () => {
+            queryClient.invalidateQueries(['adminDashboardData']);
+            toast.success('User status changed successfully');
+        }
     });
 
-    const createEventMutation = useMutation({
-        mutationFn: async (eventData) => {
-            return axios.post('/api/events', eventData, { headers: { 'Authorization': `Bearer ${user.token}` } });
+    const deleteMutation = useMutation({
+        mutationFn: async (userId) => {
+            return axios.delete(`/api/admin/users/${userId}`, { headers: { 'Authorization': `Bearer ${user.token}` } });
         },
         onSuccess: () => {
-            queryClient.invalidateQueries(['adminControlPanel']);
+            queryClient.invalidateQueries(['adminDashboardData']);
+            toast.success('User account removed');
+        }
+    });
+
+    const userActionMutation = useMutation({
+        mutationFn: async (data) => {
+            if (editingUser) {
+                return axios.put(`/api/admin/users/${editingUser.id}`, data, { headers: { 'Authorization': `Bearer ${user.token}` } });
+            } else {
+                return axios.post('/api/admin/users', data, { headers: { 'Authorization': `Bearer ${user.token}` } });
+            }
+        },
+        onSuccess: (res) => {
+            queryClient.invalidateQueries(['adminDashboardData']);
+            setIsUserModalOpen(false);
+            setEditingUser(null);
+            setUserForm({ name: '', email: '', password: '', role: 'student', college: '' });
+            toast.success(editingUser ? 'Profile updated successfully' : 'New user created successfully');
+        },
+        onError: (err) => toast.error(err.response?.data?.message || 'Error saving user')
+    });
+
+    const eventMutation = useMutation({
+        mutationFn: async (data) => {
+            return axios.post('/api/events', data, { headers: { 'Authorization': `Bearer ${user.token}` } });
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries(['adminDashboardData']);
             setIsEventModalOpen(false);
-            setNewEvent({ title: '', description: '', date: '', type: 'general' });
+            setEventForm({ title: '', description: '', date: '', type: 'general' });
+            toast.success('Event published successfully');
         }
     });
 
     const deleteEventMutation = useMutation({
-        mutationFn: async (eventId) => {
-            return axios.delete(`/api/events/${eventId}`, { headers: { 'Authorization': `Bearer ${user.token}` } });
+        mutationFn: async (id) => {
+            return axios.delete(`/api/events/${id}`, { headers: { 'Authorization': `Bearer ${user.token}` } });
         },
-        onSuccess: () => queryClient.invalidateQueries(['adminControlPanel'])
+        onSuccess: () => {
+            queryClient.invalidateQueries(['adminDashboardData']);
+            toast.success('Event deleted');
+        }
     });
 
+    // Filtering logic
+    const filteredContent = useMemo(() => {
+        if (!adminData) return [];
+        let source = [];
+        if (activeTab === 'pending') source = adminData.pending;
+        else if (activeTab === 'students') source = adminData.users.filter(u => u.role === 'student');
+        else if (activeTab === 'alumni') source = adminData.users.filter(u => u.role === 'alumni');
+        else if (activeTab === 'events') return adminData.events.filter(e => e.title.toLowerCase().includes(searchQuery.toLowerCase()));
+        else return [];
+
+        return source.filter(u => 
+            u.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+            u.email.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+    }, [adminData, activeTab, searchQuery]);
+
     if (isLoading) return (
-        <div className="flex items-center justify-center min-h-[600px]">
-            <div className="w-12 h-12 border-4 border-slate-900/10 border-t-slate-900 rounded-full animate-spin"></div>
+        <div className="flex items-center justify-center min-h-screen bg-slate-50">
+            <div className="flex flex-col items-center gap-4">
+                <div className="w-10 h-10 border-4 border-indigo-600/20 border-t-indigo-600 rounded-full animate-spin"></div>
+                <p className="text-slate-500 font-medium text-sm">Loading admin dashboard...</p>
+            </div>
+        </div>
+    );
+
+    if (isError) return (
+        <div className="flex items-center justify-center min-h-screen">
+            <div className="text-center p-8 bg-white rounded-2xl shadow-xl max-w-md">
+                <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+                <h2 className="text-2xl font-bold text-slate-900 mb-2">Connection Error</h2>
+                <p className="text-slate-500 mb-6">We couldn't connect to the database. Please check your network or token.</p>
+                <button onClick={() => refetch()} className="px-6 py-2 bg-slate-900 text-white rounded-lg font-bold">Retry Connection</button>
+            </div>
         </div>
     );
 
     const { stats, pending = [], users = [], events = [] } = adminData;
-    const totalUsers = stats?.users?.reduce((a, b) => a + parseInt(b.count), 0) || 0;
 
     return (
-        <div className="max-w-7xl mx-auto px-6 lg:px-12 py-16">
-            {/* Realtime Status */}
-            <div className="fixed bottom-8 right-8 z-[100]">
-                <div className="flex items-center gap-3 bg-white/90 backdrop-blur-xl px-5 py-3 rounded-2xl shadow-2xl border border-slate-100">
-                    <div className={`w-2 h-2 rounded-full ${isFetching ? 'bg-slate-900 animate-pulse' : 'bg-emerald-500'} relative`}>
-                        <div className={`absolute inset-0 rounded-full ${isFetching ? 'bg-slate-900' : 'bg-emerald-500'} animate-ping`}></div>
-                    </div>
-                    <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500">Node Syncing</span>
-                </div>
-            </div>
-
-            <header className="mb-20 flex flex-col md:flex-row md:items-end justify-between gap-12">
-                <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
-                    <div className="flex items-center gap-3 mb-6">
-                        <div className="px-3 py-1 bg-slate-900 text-white rounded-full text-[10px] font-black uppercase tracking-widest">Admin Omni</div>
-                        <span className="text-slate-300">/</span>
-                        <span className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Control Root</span>
-                    </div>
-                    <h1 className="text-6xl font-black text-slate-900 tracking-tighter mb-2">Platform <span className="text-slate-500">Control</span></h1>
-                    <p className="text-slate-500 font-bold uppercase text-[10px] tracking-[0.4em]">Master management interface • v4.0.2</p>
-                </motion.div>
-                <div className="flex gap-4">
-                    <button onClick={() => setIsEventModalOpen(true)} className="w-16 h-16 bg-slate-900 text-white rounded-[24px] flex items-center justify-center hover:scale-110 active:scale-95 transition-all shadow-2xl shadow-slate-200"><Plus className="w-6 h-6" /></button>
-                    <button className="w-16 h-16 bg-white border border-slate-200 text-slate-900 rounded-[24px] flex items-center justify-center hover:bg-slate-50 transition-all"><Settings className="w-5 h-5" /></button>
-                </div>
-            </header>
-
-            {/* Metrics Section */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-20">
-                {[
-                    { label: 'Network Cells', value: totalUsers, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
-                    { label: 'Unverified Signals', value: pending.length, icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50' },
-                    { label: 'Event Broadcasts', value: events.length, icon: Calendar, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-                    { label: 'Security Status', value: '100%', icon: ShieldCheck, color: 'text-emerald-600', bg: 'bg-emerald-50' }
-                ].map((s, i) => (
-                    <motion.div key={i} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.1 }} className="premium-card p-10 h-44 flex flex-col justify-between group cursor-default hover:bg-slate-900 transition-all duration-700">
-                        <div className="flex justify-between items-start">
-                            <div className={`w-12 h-12 ${s.bg} ${s.color} rounded-2xl flex items-center justify-center group-hover:bg-white/10 group-hover:text-white transition-colors`}><s.icon className="w-5 h-5" /></div>
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest group-hover:text-slate-500 transition-colors">{s.label}</span>
+        <div className="min-h-screen bg-slate-50 flex">
+            {/* Simple Navigation Sidebar */}
+            <aside className="w-72 bg-white border-r border-slate-200 hidden lg:flex flex-col sticky top-0 h-screen">
+                <div className="p-8">
+                    <div className="flex items-center gap-3 mb-10">
+                        <div className="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center">
+                            <Shield className="text-white w-5 h-5" />
                         </div>
-                        <div className="text-4xl font-black text-slate-900 group-hover:text-white transition-colors tracking-tighter">{s.value}</div>
-                    </motion.div>
-                ))}
-            </div>
+                        <h2 className="text-xl font-bold text-slate-900 tracking-tight">Admin Center</h2>
+                    </div>
+                    
+                    <nav className="space-y-1">
+                        {[
+                            { id: 'overview', label: 'Dashboard Overview', icon: LayoutDashboard },
+                            { id: 'pending', label: 'Pending Approvals', icon: Clock, count: pending.length },
+                            { id: 'students', label: 'Manage Students', icon: GraduationCap },
+                            { id: 'alumni', label: 'Manage Alumni', icon: Briefcase },
+                            { id: 'events', label: 'Campus Events', icon: Calendar },
+                        ].map((item) => (
+                            <button
+                                key={item.id}
+                                onClick={() => setActiveTab(item.id)}
+                                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all ${
+                                    activeTab === item.id 
+                                    ? 'bg-indigo-50 text-indigo-600 font-bold' 
+                                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
+                                }`}
+                            >
+                                <div className="flex items-center gap-3 text-sm">
+                                    <item.icon className={`w-4.5 h-4.5 ${activeTab === item.id ? 'text-indigo-600' : 'text-slate-400'}`} />
+                                    {item.label}
+                                </div>
+                                {item.count > 0 && <span className="bg-red-500 text-white text-[10px] h-5 w-5 rounded-full flex items-center justify-center font-bold animate-pulse">{item.count}</span>}
+                            </button>
+                        ))}
+                    </nav>
+                </div>
 
-            <div className="grid lg:grid-cols-12 gap-12">
-                {/* Main Control Tables */}
-                <div className="lg:col-span-8 space-y-12">
-                    {/* Verification Queue */}
-                    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="premium-card overflow-hidden">
-                        <div className="p-10 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-                            <h3 className="text-lg font-black text-slate-900 tracking-tighter flex items-center gap-3">
-                                <Clock className="w-5 h-5 text-amber-500" /> Verification Queue
-                            </h3>
-                            <div className="relative">
-                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                                <input
-                                    type="text"
-                                    className="w-56 pl-11 pr-4 h-10 bg-white border border-slate-200 rounded-xl text-xs font-bold focus:ring-4 focus:ring-slate-900/5 outline-none transition-all"
-                                    placeholder="Filter signals..."
-                                    value={search}
-                                    onChange={(e) => setSearch(e.target.value)}
-                                />
+                <div className="mt-auto p-8 border-t border-slate-100">
+                    <div className="flex items-center gap-3 mb-6 bg-slate-50 p-4 rounded-2xl">
+                        <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 text-sm font-bold">{user.name.charAt(0)}</div>
+                        <div className="truncate">
+                            <p className="text-sm font-bold text-slate-900 truncate">{user.name}</p>
+                            <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">Super Admin</p>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            {/* Main Content Area */}
+            <main className="flex-1 p-6 lg:p-12 overflow-y-auto">
+                <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
+                    <div>
+                        <h1 className="text-4xl font-black text-slate-900 tracking-tight mb-1 capitalize">
+                            {activeTab.replace('-', ' ')}
+                        </h1>
+                        <p className="text-slate-500 font-medium">Manage and monitor platform activity in real-time.</p>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                        <button 
+                            onClick={() => { setEditingUser(null); setUserForm({ name: '', email: '', password: '', role: 'student', college: '' }); setIsUserModalOpen(true); }}
+                            className="bg-slate-900 text-white px-6 py-3 rounded-xl flex items-center gap-2 hover:bg-slate-800 transition-all font-bold text-sm shadow-lg shadow-slate-200"
+                        >
+                            <Plus className="w-4 h-4" /> Add User
+                        </button>
+                        <button 
+                            onClick={() => setIsEventModalOpen(true)}
+                            className="bg-white border border-slate-200 text-slate-900 px-6 py-3 rounded-xl flex items-center gap-2 hover:bg-slate-50 transition-all font-bold text-sm"
+                        >
+                            <Megaphone className="w-4 h-4" /> Post Event
+                        </button>
+                    </div>
+                </header>
+
+                {activeTab === 'overview' ? (
+                    <div className="space-y-12">
+                        {/* Statistics Grid */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                            {[
+                                { label: 'Total Users', value: users.length, icon: Users, color: 'indigo' },
+                                { label: 'Pending Approvals', value: pending.length, icon: Clock, color: 'amber' },
+                                { label: 'Active Students', value: users.filter(u => u.role === 'student').length, icon: GraduationCap, color: 'blue' },
+                                { label: 'Active Alumni', value: users.filter(u => u.role === 'alumni').length, icon: Briefcase, color: 'emerald' }
+                            ].map((s, i) => (
+                                <div key={i} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <div className={`w-12 h-12 rounded-2xl bg-${s.color}-50 text-${s.color}-600 flex items-center justify-center`}>
+                                            <s.icon className="w-6 h-6" />
+                                        </div>
+                                        <div className="p-1 px-2.5 bg-slate-50 rounded-lg text-[10px] font-bold text-slate-400 uppercase tracking-wider">Live</div>
+                                    </div>
+                                    <p className="text-slate-500 text-sm font-semibold mb-1">{s.label}</p>
+                                    <h3 className="text-3xl font-black text-slate-900 tracking-tight">{s.value}</h3>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Recent Activity or Recent Users */}
+                        <div className="bg-white rounded-[32px] border border-slate-200 shadow-sm overflow-hidden">
+                            <div className="p-8 border-b border-slate-100 flex items-center justify-between">
+                                <h3 className="text-xl font-bold text-slate-900">Recently Registered</h3>
+                                <button onClick={() => setActiveTab('students')} className="text-indigo-600 text-xs font-bold hover:underline">View All Users</button>
                             </div>
-                        </div>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left">
-                                <thead className="bg-slate-50/50 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-100">
-                                    <tr>
-                                        <th className="px-10 py-6">Identity Source</th>
-                                        <th className="px-10 py-6">Professional Context</th>
-                                        <th className="px-10 py-6 text-right">Approval Protocol</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100">
-                                    {pending.length > 0 ? (
-                                        pending.filter(p => p.name.toLowerCase().includes(search.toLowerCase())).map((item) => (
-                                            <tr key={item.id} className="hover:bg-slate-50/50 transition-all group">
-                                                <td className="px-10 py-8">
-                                                    <div className="font-black text-slate-900 text-sm mb-1">{item.name}</div>
-                                                    <div className="text-xs font-bold text-slate-400">{item.email}</div>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left">
+                                    <thead className="bg-slate-50/50 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                                        <tr>
+                                            <th className="px-8 py-5">User</th>
+                                            <th className="px-8 py-5">Role</th>
+                                            <th className="px-8 py-5">Date Joined</th>
+                                            <th className="px-8 py-5 text-right">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {users.slice(0, 5).map((u) => (
+                                            <tr key={u.id} className="hover:bg-slate-50/50 transition-colors">
+                                                <td className="px-8 py-6">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-9 h-9 bg-slate-100 rounded-xl flex items-center justify-center text-slate-900 font-bold text-sm">{u.name.charAt(0)}</div>
+                                                        <div>
+                                                            <p className="text-sm font-bold text-slate-900">{u.name}</p>
+                                                            <p className="text-[11px] text-slate-500 font-medium">{u.email}</p>
+                                                        </div>
+                                                    </div>
                                                 </td>
-                                                <td className="px-10 py-8">
-                                                    <div className="font-bold text-slate-700 text-xs mb-1">{item.job_role}</div>
-                                                    <div className="px-2 py-0.5 bg-indigo-50 text-indigo-600 text-[9px] font-black uppercase tracking-tighter rounded inline-block">{item.company}</div>
+                                                <td className="px-8 py-6">
+                                                    <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${u.role === 'alumni' ? 'bg-indigo-50 text-indigo-600' : 'bg-blue-50 text-blue-600'}`}>
+                                                        {u.role}
+                                                    </span>
                                                 </td>
-                                                <td className="px-10 py-8 text-right">
-                                                    <div className="flex items-center justify-end gap-3 translate-x-4 opacity-0 group-hover:opacity-100 group-hover:translate-x-0 transition-all">
-                                                        <button onClick={() => approvalMutation.mutate({ userId: item.id, status: 'rejected' })} className="w-10 h-10 flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"><X className="w-5 h-5" /></button>
-                                                        <button onClick={() => approvalMutation.mutate({ userId: item.id, status: 'approved' })} className="px-6 py-2.5 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 shadow-xl shadow-slate-200 transition-all">Authorize</button>
+                                                <td className="px-8 py-6 text-sm text-slate-500 font-medium">
+                                                    {new Date(u.created_at).toLocaleDateString()}
+                                                </td>
+                                                <td className="px-8 py-6 text-right">
+                                                    <div className={`flex items-center justify-end gap-2 text-[10px] font-bold uppercase tracking-wider ${u.is_active ? 'text-emerald-500' : 'text-red-500'}`}>
+                                                        <div className={`w-2 h-2 rounded-full ${u.is_active ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
+                                                        {u.is_active ? 'Active' : 'Inactive'}
                                                     </div>
                                                 </td>
                                             </tr>
-                                        ))
-                                    ) : (
-                                        <tr><td colSpan="3" className="px-10 py-24 text-center text-slate-300 font-bold uppercase text-[10px] tracking-[0.3em]">Queue fully synchronized</td></tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    </motion.div>
-
-                    {/* Member Directory */}
-                    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="premium-card overflow-hidden bg-slate-900 text-white">
-                        <div className="p-10 border-b border-white/10 flex items-center justify-between">
-                            <h3 className="text-lg font-black tracking-tighter">Central Node Directory</h3>
-                            <button className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-white transition-colors">Export DB</button>
-                        </div>
-                        <div className="overflow-x-auto max-h-[600px] modern-scrollbar">
-                            <table className="w-full text-left">
-                                <thead className="bg-white/5 text-[9px] font-black text-slate-500 uppercase tracking-[0.3em] sticky top-0 backdrop-blur-md">
-                                    <tr>
-                                        <th className="px-10 py-6">Member Node</th>
-                                        <th className="px-10 py-6">Role Sector</th>
-                                        <th className="px-10 py-6">Status Signal</th>
-                                        <th className="px-10 py-6 text-right">Access Link</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-white/5">
-                                    {users.filter(u => u.name.toLowerCase().includes(memberSearch.toLowerCase())).map((member) => (
-                                        <tr key={member.id} className="hover:bg-white/5 transition-colors">
-                                            <td className="px-10 py-8 font-black text-sm">{member.name}</td>
-                                            <td className="px-10 py-8">
-                                                <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-tighter ${member.role === 'admin' ? 'bg-red-500/20 text-red-400' : 'bg-blue-500/20 text-blue-400'}`}>
-                                                    {member.role}
-                                                </span>
-                                            </td>
-                                            <td className="px-10 py-8">
-                                                <div className="flex items-center gap-2">
-                                                    <div className={`w-1.5 h-1.5 rounded-full ${member.is_active ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
-                                                    <span className={`text-[10px] font-black uppercase tracking-widest ${member.is_active ? 'text-emerald-400' : 'text-red-400'}`}>
-                                                        {member.is_active ? 'Online' : 'Restricted'}
-                                                    </span>
-                                                </div>
-                                            </td>
-                                            <td className="px-10 py-8 text-right">
-                                                <button onClick={() => toggleUserStatusMutation.mutate(member.id)} className={`text-[10px] font-black uppercase tracking-widest transition-all ${member.is_active ? 'text-slate-500 hover:text-red-400' : 'text-emerald-400 hover:scale-110'}`}>
-                                                    {member.is_active ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </motion.div>
-                </div>
-
-                {/* Broadcast Sidebar */}
-                <div className="lg:col-span-4 space-y-12">
-                    <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="premium-card p-10">
-                        <h3 className="text-xl font-black text-slate-900 tracking-tighter mb-10 flex items-center justify-between">
-                            Event Broadcasts <Megaphone className="w-5 h-5 text-indigo-500" />
-                        </h3>
-                        <div className="space-y-6">
-                            {events.map((event) => (
-                                <div key={event.id} className="p-8 bg-slate-50 border border-slate-100 rounded-[32px] group relative hover:bg-white hover:shadow-xl hover:border-indigo-100 transition-all duration-500">
-                                    <button onClick={() => deleteEventMutation.mutate(event.id)} className="absolute top-4 right-4 text-slate-200 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
-                                    <div className="text-[9px] font-black text-indigo-600 uppercase tracking-widest mb-3">{event.type}</div>
-                                    <h4 className="text-lg font-black text-slate-900 leading-tight mb-4 tracking-tight">{event.title}</h4>
-                                    <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest"><Calendar className="w-4 h-4" /> {new Date(event.date).toLocaleDateString()}</div>
-                                </div>
-                            ))}
-                            {events.length === 0 && (
-                                <div className="py-20 text-center text-slate-300 font-bold uppercase text-[10px] tracking-widest">No transmissions active</div>
-                            )}
-                        </div>
-                    </motion.div>
-
-                    <div className="bg-gradient-to-br from-indigo-600 to-violet-800 p-12 rounded-[48px] text-white shadow-2xl relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-150 transition-transform duration-1000"><Shield className="w-32 h-32" /></div>
-                        <h4 className="text-2xl font-black tracking-tight mb-4">Core Integrity</h4>
-                        <p className="text-sm font-bold text-white/70 leading-relaxed mb-8">All master nodes are synchronized. Automatic fallback protocols are engaged for 0 downtime maintenance.</p>
-                        <div className="flex items-center gap-3 text-[10px] font-black uppercase tracking-widest bg-white/10 w-fit px-4 py-2 rounded-full backdrop-blur-md">
-                            <div className="w-2 h-2 bg-emerald-400 rounded-full animate-ping" /> Synchronized
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
-                </div>
-            </div>
+                ) : (
+                    <div className="bg-white rounded-[32px] border border-slate-200 shadow-sm overflow-hidden">
+                        {/* Tab Filter & Search */}
+                        <div className="p-8 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                            <div className="relative w-full md:w-96">
+                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-400" />
+                                <input
+                                    type="text"
+                                    className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-medium focus:ring-4 focus:ring-indigo-50 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400"
+                                    placeholder={`Search ${activeTab}...`}
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                />
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <span className="text-xs font-semibold text-slate-400">{filteredContent.length} Results Found</span>
+                                <div className="w-px h-5 bg-slate-200 mx-2"></div>
+                                <button className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-100 transition-all">
+                                    <Filter className="w-4 h-4" />
+                                </button>
+                            </div>
+                        </div>
 
-            {/* Event Modals and high-end overlays */}
+                        {/* List Content */}
+                        <div className="overflow-x-auto min-h-[400px]">
+                            {activeTab === 'events' ? (
+                                <div className="p-8 grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    {filteredContent.map((event) => (
+                                        <div key={event.id} className="p-6 bg-slate-50 border border-slate-200 rounded-3xl hover:bg-white hover:shadow-xl transition-all duration-300 group">
+                                            <div className="flex justify-between items-start mb-6">
+                                                <span className="px-3 py-1 bg-indigo-100 text-indigo-600 text-[10px] font-bold uppercase rounded-lg">{event.type}</span>
+                                                <button onClick={() => deleteEventMutation.mutate(event.id)} className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"><Trash2 className="w-4 h-4" /></button>
+                                            </div>
+                                            <h4 className="text-lg font-bold text-slate-900 mb-3 line-clamp-2">{event.title}</h4>
+                                            <p className="text-slate-500 text-sm mb-6 line-clamp-3 leading-relaxed">{event.description}</p>
+                                            <div className="flex items-center gap-2 text-xs font-bold text-slate-400">
+                                                <Calendar className="w-4 h-4" /> {new Date(event.date).toLocaleDateString()}
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {filteredContent.length === 0 && (
+                                        <div className="col-span-full py-20 text-center text-slate-400 font-medium">No events found matching your search.</div>
+                                    )}
+                                </div>
+                            ) : (
+                                <table className="w-full text-left">
+                                    <thead className="bg-slate-50/50 text-[11px] font-bold text-slate-400 uppercase tracking-wider sticky top-0">
+                                        <tr>
+                                            <th className="px-8 py-5">Full Profile</th>
+                                            <th className="px-8 py-5">Role & Details</th>
+                                            <th className="px-8 py-5">Verified Status</th>
+                                            <th className="px-8 py-5 text-right">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {filteredContent.map((u) => (
+                                            <tr key={u.id} className="hover:bg-slate-50/20 transition-colors group">
+                                                <td className="px-8 py-6">
+                                                    <div className="flex items-center gap-4">
+                                                        <div className="w-11 h-11 bg-slate-900 text-white rounded-2xl flex items-center justify-center text-sm font-bold shadow-sm">
+                                                            {u.name.charAt(0)}
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-sm font-bold text-slate-900">{u.name}</p>
+                                                            <p className="text-[11px] text-slate-400 font-medium">{u.email}</p>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="px-8 py-6">
+                                                    <div className="space-y-1.5">
+                                                        <span className={`inline-block px-2.5 py-0.5 rounded-lg text-[9px] font-bold uppercase tracking-wider ${u.role === 'alumni' ? 'bg-indigo-50 text-indigo-600' : 'bg-blue-50 text-blue-600'}`}>
+                                                            {u.role}
+                                                        </span>
+                                                        <div className="flex items-center gap-2 text-[11px] font-medium text-slate-500">
+                                                            <Building2 className="w-3.5 h-3.5" /> {u.college || 'No University Data'}
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="px-8 py-6">
+                                                    <div className="flex flex-col gap-2">
+                                                        <div className="flex items-center gap-2">
+                                                            <div className={`w-1.5 h-1.5 rounded-full ${u.is_active ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                                                            <span className={`text-[10px] font-bold uppercase tracking-wider ${u.is_active ? 'text-emerald-500' : 'text-red-500'}`}>
+                                                                Account {u.is_active ? 'Active' : 'Inactive'}
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <div className={`w-1.5 h-1.5 rounded-full ${u.is_approved ? 'bg-blue-500' : 'bg-amber-500'}`} />
+                                                            <span className={`text-[10px] font-bold uppercase tracking-wider ${u.is_approved ? 'text-blue-500' : 'text-amber-500'}`}>
+                                                                {u.is_approved ? 'Verified' : 'Pending Approval'}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="px-8 py-6 text-right">
+                                                    <div className="flex items-center justify-end gap-2">
+                                                        {activeTab === 'pending' ? (
+                                                            <>
+                                                                <button onClick={() => approveMutation.mutate({ userId: u.id, status: 'rejected' })} className="px-4 py-2 bg-red-50 text-red-600 rounded-xl text-[11px] font-bold hover:bg-red-100 transition-all">Reject</button>
+                                                                <button onClick={() => approveMutation.mutate({ userId: u.id, status: 'approved' })} className="px-6 py-2 bg-slate-900 text-white rounded-xl text-[11px] font-bold hover:bg-slate-800 transition-all shadow-md shadow-slate-100">Approve User</button>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <button onClick={() => handleEditUser(u)} className="p-2.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"><Edit2 className="w-4 h-4" /></button>
+                                                                <button onClick={() => toggleStatusMutation.mutate(u.id)} className={`p-2.5 rounded-xl transition-all ${u.is_active ? 'text-slate-400 hover:text-amber-500 hover:bg-amber-50' : 'text-emerald-500 hover:bg-emerald-50'}`}>
+                                                                    {u.is_active ? <XCircle className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
+                                                                </button>
+                                                                <button onClick={() => { if(window.confirm(`Are you sure you want to delete ${u.name}?`)) deleteMutation.mutate(u.id) }} className="p-2.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"><Trash2 className="w-4 h-4" /></button>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                        {filteredContent.length === 0 && (
+                                            <tr>
+                                                <td colSpan="4" className="px-8 py-32 text-center text-slate-400 font-medium">No results found for {activeTab}.</td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            )}
+                        </div>
+                    </div>
+                )}
+            </main>
+
+            {/* Modals - Simplified & Understandable */}
             <AnimatePresence>
+                {isUserModalOpen && (
+                    <div className="fixed inset-0 z-[200] flex items-center justify-center p-6">
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsUserModalOpen(false)} className="absolute inset-0 bg-slate-900/40 backdrop-blur-md" />
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                            className="bg-white w-full max-w-2xl rounded-[32px] shadow-2xl relative z-10 overflow-hidden"
+                        >
+                            <div className="p-10">
+                                <div className="flex items-center justify-between mb-10">
+                                    <h3 className="text-2xl font-bold text-slate-900 tracking-tight">{editingUser ? 'Edit User Profile' : 'Create New User Accountant'}</h3>
+                                    <button onClick={() => setIsUserModalOpen(false)} className="w-10 h-10 bg-slate-50 text-slate-400 rounded-full flex items-center justify-center hover:bg-red-50 hover:text-red-500 transition-all"><X className="w-5 h-5" /></button>
+                                </div>
+
+                                <form className="space-y-6" onSubmit={(e) => { e.preventDefault(); userActionMutation.mutate(userForm); }}>
+                                    <div className="grid grid-cols-2 gap-6">
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-slate-700 ml-1">Full Name</label>
+                                            <input type="text" className="w-full h-13 bg-slate-50 border border-slate-200 rounded-2xl px-5 text-sm font-medium focus:ring-4 focus:ring-indigo-50 focus:border-indigo-500 outline-none transition-all" required value={userForm.name} onChange={(e) => setUserForm({ ...userForm, name: e.target.value })} />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-slate-700 ml-1">Email Address</label>
+                                            <input type="email" className="w-full h-13 bg-slate-50 border border-slate-200 rounded-2xl px-5 text-sm font-medium focus:ring-4 focus:ring-indigo-50 focus:border-indigo-500 outline-none transition-all" required value={userForm.email} onChange={(e) => setUserForm({ ...userForm, email: e.target.value })} />
+                                        </div>
+                                    </div>
+
+                                    {!editingUser && (
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-slate-700 ml-1">Account Password</label>
+                                            <input type="password" placeholder="Create a secure password" className="w-full h-13 bg-slate-50 border border-slate-200 rounded-2xl px-5 text-sm font-medium focus:ring-4 focus:ring-indigo-50 focus:border-indigo-500 outline-none transition-all" required value={userForm.password} onChange={(e) => setUserForm({ ...userForm, password: e.target.value })} />
+                                        </div>
+                                    )}
+
+                                    <div className="grid grid-cols-2 gap-6">
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-slate-700 ml-1">User Role</label>
+                                            <select className="w-full h-13 bg-slate-50 border border-slate-200 rounded-2xl px-5 text-sm font-medium focus:ring-4 focus:ring-indigo-50 focus:border-indigo-500 outline-none transition-all appearance-none" value={userForm.role} onChange={(e) => setUserForm({ ...userForm, role: e.target.value })}>
+                                                <option value="student">Student</option>
+                                                <option value="alumni">Alumni</option>
+                                                <option value="admin">Administrator</option>
+                                            </select>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-slate-700 ml-1">College / Institution</label>
+                                            <input type="text" className="w-full h-13 bg-slate-50 border border-slate-200 rounded-2xl px-5 text-sm font-medium focus:ring-4 focus:ring-indigo-50 focus:border-indigo-500 outline-none transition-all" value={userForm.college} onChange={(e) => setUserForm({ ...userForm, college: e.target.value })} />
+                                        </div>
+                                    </div>
+
+                                    {editingUser && (
+                                        <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 flex gap-6">
+                                            <label className="flex items-center gap-3 cursor-pointer">
+                                                <input type="checkbox" className="w-5 h-5 rounded-lg border-slate-300 text-indigo-600 focus:ring-0" checked={userForm.is_active} onChange={(e) => setUserForm({ ...userForm, is_active: e.target.checked })} />
+                                                <span className="text-xs font-bold text-slate-700">Account Active</span>
+                                            </label>
+                                            <label className="flex items-center gap-3 cursor-pointer">
+                                                <input type="checkbox" className="w-5 h-5 rounded-lg border-slate-300 text-indigo-600 focus:ring-0" checked={userForm.is_approved} onChange={(e) => setUserForm({ ...userForm, is_approved: e.target.checked })} />
+                                                <span className="text-xs font-bold text-slate-700">Verified & Approved</span>
+                                            </label>
+                                        </div>
+                                    )}
+
+                                    <button type="submit" disabled={userActionMutation.isPending} className="w-full bg-slate-900 py-4 rounded-2xl text-white font-bold text-sm flex items-center justify-center gap-3 hover:bg-slate-800 transition-all shadow-xl shadow-slate-100 active:scale-[0.98] mt-4">
+                                        {userActionMutation.isPending ? 'Saving changes...' : (editingUser ? 'Save Profile Changes' : 'Create Account')}
+                                        <Check className="w-4 h-4" />
+                                    </button>
+                                </form>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+
                 {isEventModalOpen && (
                     <div className="fixed inset-0 z-[200] flex items-center justify-center p-6">
-                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsEventModalOpen(false)} className="absolute inset-0 bg-slate-950/60 backdrop-blur-2xl" />
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsEventModalOpen(false)} className="absolute inset-0 bg-slate-900/40 backdrop-blur-md" />
                         <motion.div
-                            initial={{ opacity: 0, scale: 0.9, y: 40 }}
+                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.9, y: 40 }}
-                            className="bg-white w-full max-w-xl rounded-[48px] shadow-2xl relative z-10 overflow-hidden"
+                            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                            className="bg-white w-full max-w-xl rounded-[32px] shadow-2xl relative z-10 overflow-hidden"
                         >
-                            <div className="p-12">
-                                <div className="flex items-center justify-between mb-12">
-                                    <h3 className="text-4xl font-black text-slate-900 tracking-tighter">Post Broadcast</h3>
-                                    <button onClick={() => setIsEventModalOpen(false)} className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center hover:bg-red-50 hover:text-red-500 transition-all"><X className="w-6 h-6" /></button>
+                            <div className="p-10">
+                                <div className="flex items-center justify-between mb-10">
+                                    <h3 className="text-2xl font-bold text-slate-900 tracking-tight">Post New Event</h3>
+                                    <button onClick={() => setIsEventModalOpen(false)} className="w-10 h-10 bg-slate-50 text-slate-400 rounded-full flex items-center justify-center hover:bg-red-50 hover:text-red-500 transition-all"><X className="w-5 h-5" /></button>
                                 </div>
-                                <form className="space-y-8" onSubmit={(e) => { e.preventDefault(); createEventMutation.mutate(newEvent); }}>
-                                    <div>
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 block ml-2">Transmission Title</label>
-                                        <input type="text" className="w-full h-16 bg-slate-50 border border-slate-100 rounded-[28px] px-8 text-sm font-bold focus:ring-8 focus:ring-slate-900/5 focus:border-slate-900 outline-none transition-all" required value={newEvent.title} onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })} />
+                                <form className="space-y-6" onSubmit={(e) => { e.preventDefault(); eventMutation.mutate(eventForm); }}>
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-slate-700 ml-1">Event Title</label>
+                                        <input type="text" className="w-full h-13 bg-slate-50 border border-slate-200 rounded-2xl px-5 text-sm font-medium focus:ring-4 focus:ring-indigo-50 focus:border-indigo-500 outline-none transition-all" required value={eventForm.title} onChange={(e) => setEventForm({ ...eventForm, title: e.target.value })} />
                                     </div>
                                     <div className="grid grid-cols-2 gap-6">
-                                        <div>
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 block ml-2">Temporal Node (Date)</label>
-                                            <input type="datetime-local" className="w-full h-16 bg-slate-50 border border-slate-100 rounded-[28px] px-8 text-xs font-bold focus:ring-8 focus:ring-slate-900/5 focus:border-slate-900 outline-none transition-all" required value={newEvent.date} onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })} />
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-slate-700 ml-1">Event Date</label>
+                                            <input type="datetime-local" className="w-full h-13 bg-slate-50 border border-slate-200 rounded-2xl px-5 text-sm font-medium focus:ring-4 focus:ring-indigo-50 focus:border-indigo-500 outline-none transition-all" required value={eventForm.date} onChange={(e) => setEventForm({ ...eventForm, date: e.target.value })} />
                                         </div>
-                                        <div>
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 block ml-2">Signal Category</label>
-                                            <select className="w-full h-16 bg-slate-50 border border-slate-100 rounded-[28px] px-8 text-xs font-bold focus:ring-8 focus:ring-slate-900/5 focus:border-slate-900 outline-none transition-all appearance-none" value={newEvent.type} onChange={(e) => setNewEvent({ ...newEvent, type: e.target.value })}>
-                                                <option value="general">Broadcast</option>
-                                                <option value="training">Technical</option>
-                                                <option value="placement">Career Node</option>
-                                                <option value="alumni_meet">Assembly</option>
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-slate-700 ml-1">Category</label>
+                                            <select className="w-full h-13 bg-slate-50 border border-slate-200 rounded-2xl px-5 text-sm font-medium focus:ring-4 focus:ring-indigo-50 focus:border-indigo-500 outline-none transition-all appearance-none" value={eventForm.type} onChange={(e) => setEventForm({ ...eventForm, type: e.target.value })}>
+                                                <option value="general">General Broadcast</option>
+                                                <option value="training">Technical Training</option>
+                                                <option value="placement">Placement Drive</option>
+                                                <option value="alumni_meet">Alumni Meetup</option>
                                             </select>
                                         </div>
                                     </div>
-                                    <div>
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 block ml-2">Payload Description</label>
-                                        <textarea className="w-full p-8 bg-slate-50 border border-slate-100 rounded-[32px] text-sm font-medium min-h-[140px] focus:ring-8 focus:ring-slate-900/5 focus:border-slate-900 outline-none transition-all" required value={newEvent.description} onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })} />
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-slate-700 ml-1">Description</label>
+                                        <textarea className="w-full p-5 bg-slate-50 border border-slate-200 rounded-3xl text-sm font-medium min-h-[140px] focus:ring-4 focus:ring-indigo-50 focus:border-indigo-500 outline-none transition-all" required value={eventForm.description} onChange={(e) => setEventForm({ ...eventForm, description: e.target.value })} />
                                     </div>
-                                    <button type="submit" disabled={createEventMutation.isPending} className="w-full bg-slate-900 py-6 rounded-[32px] text-white font-black uppercase tracking-[0.3em] text-xs flex items-center justify-center gap-4 hover:bg-indigo-600 transition-all shadow-2xl shadow-slate-200 active:scale-95">
-                                        {createEventMutation.isPending ? 'Propagating...' : 'Post Broadcast'} <Zap className="w-5 h-5" />
+                                    <button type="submit" disabled={eventMutation.isPending} className="w-full bg-slate-900 py-4 rounded-2xl text-white font-bold text-sm flex items-center justify-center gap-3 hover:bg-slate-800 transition-all shadow-xl shadow-slate-100 active:scale-[0.98] mt-4">
+                                        {eventMutation.isPending ? 'Posting event...' : 'Publish Event'}
+                                        <Calendar className="w-4 h-4" />
                                     </button>
                                 </form>
                             </div>
@@ -313,6 +557,19 @@ const AdminDashboard = () => {
             </AnimatePresence>
         </div>
     );
+
+    function handleEditUser(userItem) {
+        setEditingUser(userItem);
+        setUserForm({
+            name: userItem.name,
+            email: userItem.email,
+            role: userItem.role,
+            college: userItem.college || '',
+            is_active: userItem.is_active,
+            is_approved: userItem.is_approved
+        });
+        setIsUserModalOpen(true);
+    }
 };
 
 export default AdminDashboard;

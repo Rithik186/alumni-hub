@@ -62,7 +62,7 @@ const Profile = () => {
         setUploading(true);
         setUploadTarget('pic');
         const formData = new FormData();
-        formData.append('image', file);
+        formData.append('profile_picture', file);
 
         try {
             const res = await fetch('/api/upload/profile-picture', {
@@ -72,9 +72,9 @@ const Profile = () => {
             });
             const data = await res.json();
             if (res.ok) {
-                setProfileData(prev => ({ ...prev, profile_picture: data.url }));
+                setProfileData(prev => ({ ...prev, profile_picture: data.profile_picture }));
                 // Update context too
-                login({ ...user, profile_picture: data.url });
+                login({ ...user, profile_picture: data.profile_picture });
                 setMessage({ text: 'Profile picture updated!', type: 'success' });
             } else {
                 setMessage({ text: data.message || 'Upload failed', type: 'error' });

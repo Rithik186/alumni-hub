@@ -36,6 +36,10 @@ export const Navbar = () => {
         { name: 'Profile', path: '/profile', icon: User },
     ];
 
+    if (user?.role === 'admin') {
+        navLinks.push({ name: 'Admin', path: '/admin', icon: Activity });
+    }
+
     return (
         <>
             <nav className="fixed top-0 left-0 right-0 z-[150] h-14 bg-white border-b border-slate-200 shadow-sm">

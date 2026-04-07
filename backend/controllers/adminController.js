@@ -1,4 +1,5 @@
 import db from '../config/db.js';
+import bcrypt from 'bcryptjs';
 
 // Get all pending alumni registrations
 export const getPendingAlumni = async (req, res) => {
@@ -78,5 +79,69 @@ export const toggleUserStatus = async (req, res) => {
     } catch (error) {
         console.error('Toggle User Status Error:', error);
         res.status(500).json({ message: 'Server error toggling user status' });
+    }
+};
+
+// Delete user
+export const deleteUser = async (req, res) => {
+    const { userId } = req.params;
+    try {
+        // Due to cascade delete, profiles will be deleted automatically
+        await db.query('DELETE FROM users WHERE id = $1', [userId]);
+        res.json({ message: 'User deleted successfully' });
+    } catch (error) {
+        console.error('Delete User Error:', error);
+        res.status(500).json({ message: 'Server error deleting user' });
+    }
+};
+
+// Update user by admin
+export const updateUserByAdmin = async (req, res) => {
+    const { userId } = req.params;
+    const { name, email, role, is_active, is_approved, college } = req.body;
+
+    try {
+        await db.query(
+            'UPDATE users SET name = $1, email = $2, role = $3, is_active = $4, is_approved = $5, college = $6 WHERE id = $7',
+            [name, email, role, is_active, is_approved, college, userId]
+        );
+        res.json({ message: 'User updated successfully' });
+    } catch (error) {
+        console.error('Update User Admin Error:', error);
+        res.status(500).json({ message: 'Server error updating user' });
+    }
+};
+
+// Create user by admin
+export const createUserByAdmin = async (req, res) => {
+    const { name, email, password, role, college } = req.body;
+
+    try {
+        const userExists = await db.query('SELECT * FROM users WHERE email = $1', [email]);
+        if (userExists.rows.length > 0) {
+            return res.status(400).json({ message: 'User already exists' });
+        }
+
+        const salt = await bcrypt.genSalt(10);
+        const password_hash = await bcrypt.hash(password, salt);
+
+        const newUser = await db.query(
+            'INSERT INTO users (name, email, password_hash, role, college, is_verified, is_approved, is_active) VALUES ($1, $2, $3, $4, $5, true, true, true) RETURNING id',
+            [name, email, password_hash, role, college]
+        );
+
+        const userId = newUser.rows[0].id;
+
+        // Initialize empty profiles
+        if (role === 'student') {
+            await db.query('INSERT INTO student_profiles (user_id) VALUES ($1)', [userId]);
+        } else if (role === 'alumni') {
+            await db.query('INSERT INTO alumni_profiles (user_id) VALUES ($1)', [userId]);
+        }
+
+        res.status(201).json({ message: 'User created successfully', id: userId });
+    } catch (error) {
+        console.error('Create User Admin Error:', error);
+        res.status(500).json({ message: 'Server error creating user' });
     }
 };

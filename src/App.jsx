@@ -1,6 +1,9 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import AdminDashboard from './components/dashboard/AdminDashboard';
 import { UserProvider, useUser } from './context/UserContext';
+import { ThemeProvider } from './context/ThemeContext';
+import { Toaster } from 'react-hot-toast';
 import { Navbar } from './components/landing/Navbar';
 import { Hero } from './components/landing/Hero';
 import { Features } from './components/landing/Features';
@@ -31,9 +34,18 @@ const ProtectedRoute = ({ children }) => {
   return children;
 };
 
+const AdminRoute = ({ children }) => {
+  const { user, loading } = useUser();
+  if (loading) return null;
+  if (!user || user.role !== 'admin') return <Navigate to="/dashboard" />;
+  return children;
+};
+
 function App() {
   return (
     <UserProvider>
+      <ThemeProvider>
+      <Toaster position="top-right" reverseOrder={false} />
       <Router>
         <div className="min-h-screen bg-slate-50 font-sans text-slate-900 scroll-smooth">
           <Routes>
@@ -89,9 +101,18 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/admin"
+              element={
+                <AdminRoute>
+                  <AdminDashboard />
+                </AdminRoute>
+              }
+            />
           </Routes>
         </div>
       </Router>
+      </ThemeProvider>
     </UserProvider>
   );
 }

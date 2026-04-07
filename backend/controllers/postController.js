@@ -39,35 +39,47 @@ export const getFeed = async (req, res) => {
     const offset = (page - 1) * limit;
 
     try {
+        // Optimized Feed Query
+        // 1. We pre-fetch the user's college to avoid repeated subqueries in the CASE/WHERE
+        const userSettings = await db.query('SELECT college FROM users WHERE id = $1', [userId]);
+        const userCollege = userSettings.rows[0]?.college || null;
+
         const feed = await db.query(`
-            WITH feed_posts AS (
-                SELECT p.*, u.name as author_name, u.role as author_role, u.college as author_college, u.profile_picture as author_profile_picture
-                FROM posts p
-                JOIN users u ON p.user_id = u.id
-                WHERE p.user_id = $1 
-                OR p.user_id IN (SELECT following_id FROM follows WHERE follower_id = $1 AND status = 'accepted')
-                OR u.college = (SELECT college FROM users WHERE id = $1)
-                ORDER BY p.created_at DESC
-                LIMIT $2 OFFSET $3
-            )
             SELECT 
-                fp.*,
-                (SELECT COUNT(*) FROM post_likes l WHERE l.post_id = fp.id AND l.is_dislike = FALSE) as likes_count,
-                (SELECT COUNT(*) FROM post_likes l WHERE l.post_id = fp.id AND l.is_dislike = TRUE) as dislikes_count,
-                (SELECT COUNT(*) FROM post_comments c WHERE c.post_id = fp.id) as comments_count,
-                EXISTS(SELECT 1 FROM post_likes l WHERE l.post_id = fp.id AND l.user_id = $1 AND l.is_dislike = FALSE) as has_liked,
+                p.id, p.user_id, p.content, p.image_url, p.video_url, p.created_at,
+                u.name as author_name, u.role as author_role, u.college as author_college, u.profile_picture as author_profile_picture,
+                COALESCE(lc.likes_count, 0) as likes_count,
+                COALESCE(dc.dislikes_count, 0) as dislikes_count,
+                COALESCE(cc.comments_count, 0) as comments_count,
+                EXISTS(SELECT 1 FROM post_likes pl WHERE pl.post_id = p.id AND pl.user_id = $1 AND pl.is_dislike = FALSE) as has_liked,
                 (SELECT COALESCE(json_agg(json_build_object('name', lu.name)), '[]'::json) 
-                 FROM post_likes pl 
-                 JOIN users lu ON pl.user_id = lu.id 
-                 WHERE pl.post_id = fp.id AND pl.is_dislike = FALSE) as liked_by_users
-            FROM feed_posts fp
-            ORDER BY fp.created_at DESC
-        `, [userId, limit, offset]);
+                 FROM (
+                    SELECT lu2.name 
+                    FROM post_likes pl2 
+                    JOIN users lu2 ON pl2.user_id = lu2.id 
+                    WHERE pl2.post_id = p.id AND pl2.is_dislike = FALSE
+                    LIMIT 5
+                 ) as lu) as liked_by_users
+            FROM posts p
+            JOIN users u ON p.user_id = u.id
+            CROSS JOIN LATERAL (SELECT count(*) as likes_count FROM post_likes WHERE post_id = p.id AND is_dislike = FALSE) lc
+            CROSS JOIN LATERAL (SELECT count(*) as dislikes_count FROM post_likes WHERE post_id = p.id AND is_dislike = TRUE) dc
+            CROSS JOIN LATERAL (SELECT count(*) as comments_count FROM post_comments WHERE post_id = p.id) cc
+            WHERE p.user_id = $1 
+               OR u.college = $4
+               OR p.user_id IN (SELECT following_id FROM follows WHERE follower_id = $1 AND status = 'accepted')
+            ORDER BY p.created_at DESC
+            LIMIT $2 OFFSET $3
+        `, [userId, limit, offset, userCollege]);
 
         res.json(feed.rows);
     } catch (err) {
-        console.error('Feed error:', err);
-        res.status(500).json({ message: 'Error loading feed' });
+        console.error('CRITICAL: Feed loading failure:', err);
+        res.status(500).json({ 
+            message: 'Error loading feed', 
+            error: err.message,
+            stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+        });
     }
 };
 
