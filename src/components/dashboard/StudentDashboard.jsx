@@ -6,7 +6,7 @@ import {
     LayoutDashboard, Settings, TrendingUp, Compass, Edit2,
     BookOpen, Users, Zap, Smile, Sparkles, Bell,
     Briefcase, GraduationCap, Clock, Calendar,
-    ChevronRight, ExternalLink, Hash
+    ChevronRight, ExternalLink, Hash, Check, UserCheck
 } from 'lucide-react';
 import { useUser } from '../../context/UserContext';
 import { Link } from 'react-router-dom';
@@ -219,6 +219,7 @@ const StudentDashboard = () => {
     const queryClient = useQueryClient();
 
     const [view, setView] = useState('feed');
+    const [networkTab, setNetworkTab] = useState('requests');
     const [searchQuery, setSearchQuery] = useState('');
     const [filterDomain, setFilterDomain] = useState('All');
     const [showFilters, setShowFilters] = useState(false);
@@ -227,8 +228,8 @@ const StudentDashboard = () => {
     const domains = ['All', 'Engineering', 'Design', 'Data Science', 'Product', 'Marketing'];
 
     const navItems = [
-        { id: 'feed',    label: 'Feed',     icon: LayoutDashboard, path: '/dashboard' },
-        { id: 'network', label: 'Network',  icon: Users,           path: '/network' },
+        { id: 'feed',    label: 'Feed',     icon: LayoutDashboard, path: null },
+        { id: 'network', label: 'Network',  icon: Users,           path: null },
         { id: 'search',  label: 'Discover', icon: Compass,         path: null },
         { id: 'chat',    label: 'Messages', icon: MessageSquare,   path: '/chat' },
         { id: 'settings', label: 'Settings', icon: Settings, path: '/settings' },
@@ -271,6 +272,25 @@ const StudentDashboard = () => {
         refetchOnWindowFocus: false,
     });
 
+    // ── Network Queries (loaded when network view is active) ──────────────
+    const { data: followRequests = [], isLoading: loadingRequests } = useQuery({
+        queryKey: ['followRequests'],
+        queryFn: async () => (await axios.get('/api/connections/requests', authHeader(user.token))).data,
+        enabled: view === 'network',
+    });
+
+    const { data: networkFollowers = [], isLoading: loadingFollowers } = useQuery({
+        queryKey: ['followers'],
+        queryFn: async () => (await axios.get('/api/connections/followers', authHeader(user.token))).data,
+        enabled: view === 'network',
+    });
+
+    const { data: networkFollowing = [], isLoading: loadingFollowing } = useQuery({
+        queryKey: ['following'],
+        queryFn: async () => (await axios.get('/api/connections/following', authHeader(user.token))).data,
+        enabled: view === 'network',
+    });
+
     const searchEnabled = view === 'search' && (!!searchQuery || Object.values(searchFilters).some(Boolean));
     const { data: searchResults = [], isFetching: searchLoading } = useQuery({
         queryKey: ['alumniSearch', searchQuery, searchFilters],
@@ -289,6 +309,18 @@ const StudentDashboard = () => {
             queryClient.invalidateQueries(['myFollowStatuses']);
             queryClient.invalidateQueries(['suggestions']);
             queryClient.invalidateQueries(['socialStats']);
+        }
+    });
+
+    const updateRequestMutation = useMutation({
+        mutationFn: async ({ followerId, status }) => axios.put('/api/connections/follow/status', { followerId, status }, authHeader(user.token)),
+        onSuccess: () => {
+            queryClient.invalidateQueries(['followRequests']);
+            queryClient.invalidateQueries(['followers']);
+            queryClient.invalidateQueries(['following']);
+            queryClient.invalidateQueries(['socialStats']);
+            queryClient.invalidateQueries(['myFollowStatuses']);
+            queryClient.invalidateQueries(['suggestions']);
         }
     });
 
@@ -360,14 +392,14 @@ const StudentDashboard = () => {
                                     <h2 className="font-semibold text-[#1e293b] text-[14px] leading-tight truncate">{user.name}</h2>
                                     <p className="text-[11px] text-[#64748b] font-medium capitalize truncate mt-0.5">{user.role}{user.department ? ` · ${user.department}` : ''}</p>
                                     <div className="flex gap-5 mt-3 pt-3 border-t border-slate-100">
-                                        <Link to="/network" className="group">
+                                        <button onClick={() => { setView('network'); setNetworkTab('followers'); }} className="group text-left">
                                             <p className="font-bold text-[#1e293b] text-sm leading-none group-hover:text-[#2563eb] transition-colors">{stats.followers}</p>
                                             <p className="text-[10px] text-[#64748b] font-medium mt-0.5">Followers</p>
-                                        </Link>
-                                        <Link to="/network" className="group">
+                                        </button>
+                                        <button onClick={() => { setView('network'); setNetworkTab('following'); }} className="group text-left">
                                             <p className="font-bold text-[#1e293b] text-sm leading-none group-hover:text-[#2563eb] transition-colors">{stats.following}</p>
                                             <p className="text-[10px] text-[#64748b] font-medium mt-0.5">Following</p>
-                                        </Link>
+                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -576,6 +608,158 @@ const StudentDashboard = () => {
                                 )}
                             </div>
                         )}
+
+                        {/* ─── NETWORK VIEW ─────────────────────────────────────── */}
+                        {view === 'network' && (
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between px-1">
+                                    <div>
+                                        <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                                            <Users className="w-4 h-4 text-indigo-500" /> Connections & Network
+                                        </h2>
+                                        <p className="text-[11px] text-slate-400 mt-0.5 ml-6">Manage your professional network</p>
+                                    </div>
+                                    <button onClick={() => setView('feed')} className="p-2 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 transition-all">
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                </div>
+
+                                {/* Network Tabs */}
+                                <SpotlightCard className="bg-transparent" spotlightColor="rgba(79, 70, 229, 0.1)">
+                                    <div className="sd-card p-1.5 flex gap-1">
+                                        {[
+                                            { id: 'requests', label: 'Requests', icon: UserPlus, count: followRequests.length },
+                                            { id: 'followers', label: 'Followers', icon: Users, count: networkFollowers.length },
+                                            { id: 'following', label: 'Following', icon: UserCheck, count: networkFollowing.length },
+                                        ].map(tab => (
+                                            <button
+                                                key={tab.id}
+                                                onClick={() => setNetworkTab(tab.id)}
+                                                className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all ${
+                                                    networkTab === tab.id
+                                                        ? 'bg-indigo-600 text-white shadow-sm'
+                                                        : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
+                                                }`}
+                                            >
+                                                <tab.icon className="w-3.5 h-3.5" />
+                                                {tab.label}
+                                                {tab.count > 0 && (
+                                                    <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                                                        networkTab === tab.id ? 'bg-white/20' : 'bg-indigo-50 text-indigo-600'
+                                                    }`}>{tab.count}</span>
+                                                )}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </SpotlightCard>
+
+                                {/* Requests */}
+                                {networkTab === 'requests' && (
+                                    loadingRequests ? (
+                                        <div className="sd-card p-10 flex justify-center"><Loader2 className="w-7 h-7 animate-spin text-indigo-400" /></div>
+                                    ) : followRequests.length === 0 ? (
+                                        <div className="sd-card p-10 text-center">
+                                            <div className="w-14 h-14 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                                                <UserPlus className="w-7 h-7 text-indigo-200" />
+                                            </div>
+                                            <p className="font-semibold text-slate-700 text-sm mb-1">No Pending Requests</p>
+                                            <p className="text-xs text-slate-400">When someone requests to follow you, it will appear here.</p>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            {followRequests.map(req => (
+                                                <SpotlightCard key={req.follower_id || req.id} className="bg-transparent" spotlightColor="rgba(79, 70, 229, 0.08)">
+                                                    <div className="sd-card p-4 flex items-center gap-3">
+                                                        <Avatar src={req.profile_picture} name={req.follower_name || req.name} size={44} />
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="font-semibold text-slate-900 text-sm truncate">{req.follower_name || req.name}</p>
+                                                            <p className="text-[11px] text-slate-400 capitalize truncate mt-0.5">
+                                                                {req.follower_role || req.role}{req.follower_college ? ` • ${req.follower_college}` : ''}
+                                                            </p>
+                                                        </div>
+                                                        <div className="flex gap-1.5 flex-shrink-0">
+                                                            <button onClick={() => updateRequestMutation.mutate({ followerId: req.follower_id || req.id, status: 'rejected' })} className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all">
+                                                                <X className="w-4 h-4" />
+                                                            </button>
+                                                            <button onClick={() => updateRequestMutation.mutate({ followerId: req.follower_id || req.id, status: 'accepted' })} className="px-3.5 py-1.5 text-xs font-semibold bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-all flex items-center gap-1.5">
+                                                                <Check className="w-3.5 h-3.5" /> Accept
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </SpotlightCard>
+                                            ))}
+                                        </div>
+                                    )
+                                )}
+
+                                {/* Followers */}
+                                {networkTab === 'followers' && (
+                                    loadingFollowers ? (
+                                        <div className="sd-card p-10 flex justify-center"><Loader2 className="w-7 h-7 animate-spin text-indigo-400" /></div>
+                                    ) : networkFollowers.length === 0 ? (
+                                        <div className="sd-card p-10 text-center">
+                                            <div className="w-14 h-14 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                                                <Users className="w-7 h-7 text-indigo-200" />
+                                            </div>
+                                            <p className="font-semibold text-slate-700 text-sm mb-1">No Followers Yet</p>
+                                            <p className="text-xs text-slate-400">People who follow you will appear here.</p>
+                                        </div>
+                                    ) : (
+                                        <SpotlightCard className="bg-transparent" spotlightColor="rgba(79, 70, 229, 0.08)">
+                                            <div className="sd-card overflow-hidden">
+                                                <div className="p-3 border-b border-slate-100 bg-slate-50/50">
+                                                    <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">All Followers ({networkFollowers.length})</p>
+                                                </div>
+                                                <div className="divide-y divide-slate-100">
+                                                    {networkFollowers.map(f => (
+                                                        <div key={f.id} className="p-3.5 flex items-center gap-3 hover:bg-indigo-50/30 transition-colors">
+                                                            <Avatar src={f.avatar || f.profile_picture} name={f.name} size={40} />
+                                                            <div className="flex-1 min-w-0">
+                                                                <p className="text-sm font-semibold text-slate-900 truncate">{f.name}</p>
+                                                                <p className="text-[11px] text-slate-400 capitalize mt-0.5">{f.role}</p>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </SpotlightCard>
+                                    )
+                                )}
+
+                                {/* Following */}
+                                {networkTab === 'following' && (
+                                    loadingFollowing ? (
+                                        <div className="sd-card p-10 flex justify-center"><Loader2 className="w-7 h-7 animate-spin text-indigo-400" /></div>
+                                    ) : networkFollowing.length === 0 ? (
+                                        <div className="sd-card p-10 text-center">
+                                            <div className="w-14 h-14 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                                                <UserCheck className="w-7 h-7 text-indigo-200" />
+                                            </div>
+                                            <p className="font-semibold text-slate-700 text-sm mb-1">Not Following Anyone</p>
+                                            <p className="text-xs text-slate-400">People you follow will appear here.</p>
+                                        </div>
+                                    ) : (
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                            {networkFollowing.map(f => (
+                                                <SpotlightCard key={f.id} className="bg-transparent" spotlightColor="rgba(79, 70, 229, 0.08)">
+                                                    <div className="sd-card p-4 text-center">
+                                                        <Avatar src={f.avatar || f.profile_picture} name={f.name} size={48} className="mx-auto mb-2" />
+                                                        <p className="font-semibold text-slate-900 text-sm truncate">{f.name}</p>
+                                                        <p className="text-[10px] text-slate-400 capitalize mt-0.5 mb-3">{f.role}</p>
+                                                        <button
+                                                            onClick={() => updateRequestMutation.mutate({ followerId: f.id, status: 'rejected' })}
+                                                            className="w-full py-1.5 bg-slate-900 text-white hover:bg-rose-600 rounded-lg text-[11px] font-semibold transition-colors"
+                                                        >
+                                                            Unfollow
+                                                        </button>
+                                                    </div>
+                                                </SpotlightCard>
+                                            ))}
+                                        </div>
+                                    )
+                                )}
+                            </div>
+                        )}
                     </main>
 
                     {/* ═══════════════════════════════════════════════════════ */}
@@ -697,8 +881,8 @@ const StudentDashboard = () => {
             <div className="fixed bottom-0 left-0 right-0 bg-[#fafdff] border-t border-[#d1d5db] z-50 lg:hidden safe-area-inset">
                 <div className="flex items-center justify-around py-1.5 px-2 max-w-lg mx-auto">
                     {[
-                        { id: 'feed',    icon: LayoutDashboard, label: 'Home',     path: '/dashboard' },
-                        { id: 'network', icon: Users,           label: 'Network',  path: '/network' },
+                        { id: 'feed',    icon: LayoutDashboard, label: 'Home',     path: null },
+                        { id: 'network', icon: Users,           label: 'Network',  path: null },
                         { id: 'search',  icon: Compass,         label: 'Discover', path: null },
                         { id: 'chat',    icon: MessageSquare,   label: 'Chat',     path: '/chat' },
                         { id: 'settings', icon: Settings, label: 'Settings', path: '/settings' },

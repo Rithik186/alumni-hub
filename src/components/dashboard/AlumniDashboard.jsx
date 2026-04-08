@@ -9,7 +9,7 @@ import {
     TrendingUp, UserPlus, Compass,
     Loader2, Edit2, Zap, Bookmark,
     Clock, ChevronRight, Hash, Smile, BookOpen,
-    Filter, Briefcase, Award, GraduationCap
+    Filter, Briefcase, Award, GraduationCap, UserCheck, Check
 } from 'lucide-react';
 import { useUser } from '../../context/UserContext';
 import axios from 'axios';
@@ -219,10 +219,11 @@ const AlumniDashboard = () => {
     const { user } = useUser();
     const queryClient = useQueryClient();
     const [activeTab, setActiveTab] = useState('feed');
+    const [networkTab, setNetworkTab] = useState('requests');
 
     const navItems = [
-        { id: 'feed', label: 'Feed', icon: LayoutDashboard, path: '/dashboard' },
-        { id: 'network', label: 'Network', icon: Users, path: '/network' },
+        { id: 'feed', label: 'Feed', icon: LayoutDashboard, isTab: true },
+        { id: 'network', label: 'Network', icon: Users, isTab: true },
         { id: 'notifications', label: 'Alerts', icon: Bell, isTab: true },
         { id: 'chat', label: 'Messages', icon: MessageSquare, path: '/chat' },
         { id: 'settings', label: 'Settings', icon: Settings, path: '/settings' },
@@ -275,6 +276,19 @@ const AlumniDashboard = () => {
         refetchInterval: 5 * 60 * 1000,
         refetchOnWindowFocus: false,
         retry: 2,
+    });
+
+    // ── Network Queries (loaded when network tab is active) ──────────────
+    const { data: networkFollowers = [], isLoading: loadingFollowers } = useQuery({
+        queryKey: ['followers'],
+        queryFn: async () => (await axios.get('/api/connections/followers', authHeader(user.token))).data,
+        enabled: activeTab === 'network',
+    });
+
+    const { data: networkFollowing = [], isLoading: loadingFollowing } = useQuery({
+        queryKey: ['following'],
+        queryFn: async () => (await axios.get('/api/connections/following', authHeader(user.token))).data,
+        enabled: activeTab === 'network',
     });
 
     // ── Mutations ────────────────────────────────────────────────────────────
@@ -365,16 +379,16 @@ const AlumniDashboard = () => {
                                     <Separator className="my-3" />
                                     <div className="flex gap-5">
                                         <Tooltip content="View Followers">
-                                            <Link to="/network" className="group">
+                                            <button onClick={() => { setActiveTab('network'); setNetworkTab('followers'); }} className="group text-left">
                                                 <p className="font-bold text-slate-900 text-sm leading-none group-hover:text-teal-600 transition-colors">{stats.followers}</p>
                                                 <p className="text-[10px] text-slate-500 font-medium mt-0.5">Followers</p>
-                                            </Link>
+                                            </button>
                                         </Tooltip>
                                         <Tooltip content="View Following">
-                                            <Link to="/network" className="group">
+                                            <button onClick={() => { setActiveTab('network'); setNetworkTab('following'); }} className="group text-left">
                                                 <p className="font-bold text-slate-900 text-sm leading-none group-hover:text-teal-600 transition-colors">{stats.following}</p>
                                                 <p className="text-[10px] text-slate-500 font-medium mt-0.5">Following</p>
-                                            </Link>
+                                            </button>
                                         </Tooltip>
                                     </div>
                                     {/* Profile Completion */}
@@ -572,6 +586,170 @@ const AlumniDashboard = () => {
                                 )}
                             </div>
                         )}
+
+                        {/* ─── NETWORK VIEW ─────────────────────────────────────── */}
+                        {activeTab === 'network' && (
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between px-1">
+                                    <div>
+                                        <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                                            <Users className="w-4 h-4 text-teal-600" /> Connections & Network
+                                        </h2>
+                                        <p className="text-[11px] text-slate-400 mt-0.5 ml-6">Manage your professional network</p>
+                                    </div>
+                                    <Button variant="ghost" size="icon" onClick={() => setActiveTab('feed')} className="h-8 w-8">
+                                        <X className="w-4 h-4" />
+                                    </Button>
+                                </div>
+
+                                {/* Network Tabs */}
+                                <Card className="border-slate-200/80 bg-white/95 backdrop-blur-sm p-1.5 flex gap-1">
+                                    {[
+                                        { id: 'requests', label: 'Requests', icon: UserPlus, count: followRequests.length },
+                                        { id: 'followers', label: 'Followers', icon: Users, count: networkFollowers.length },
+                                        { id: 'following', label: 'Following', icon: UserCheck, count: networkFollowing.length },
+                                    ].map(tab => (
+                                        <button
+                                            key={tab.id}
+                                            onClick={() => setNetworkTab(tab.id)}
+                                            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all ${
+                                                networkTab === tab.id
+                                                    ? 'bg-teal-600 text-white shadow-sm'
+                                                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
+                                            }`}
+                                        >
+                                            <tab.icon className="w-3.5 h-3.5" />
+                                            {tab.label}
+                                            {tab.count > 0 && (
+                                                <Badge variant={networkTab === tab.id ? 'secondary' : 'outline'} className={`text-[9px] px-1.5 py-0 ${networkTab === tab.id ? 'bg-white/20 text-white border-0' : ''}`}>
+                                                    {tab.count}
+                                                </Badge>
+                                            )}
+                                        </button>
+                                    ))}
+                                </Card>
+
+                                {/* Requests */}
+                                {networkTab === 'requests' && (
+                                    followRequests.length === 0 ? (
+                                        <Card className="border-slate-200/80 bg-white/95">
+                                            <CardContent className="p-10 text-center">
+                                                <div className="w-14 h-14 bg-teal-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                                                    <UserPlus className="w-7 h-7 text-teal-200" />
+                                                </div>
+                                                <p className="font-semibold text-slate-700 text-sm mb-1">No Pending Requests</p>
+                                                <p className="text-xs text-slate-400">When someone requests to follow you, it will appear here.</p>
+                                            </CardContent>
+                                        </Card>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            {followRequests.map(req => (
+                                                <SpotlightCard key={req.follower_id || req.id} className="bg-transparent" spotlightColor="rgba(20, 184, 166, 0.08)">
+                                                    <Card className="border-slate-200/80 bg-white/95">
+                                                        <CardContent className="p-4 flex items-center gap-3">
+                                                            <ProfileAvatar src={req.profile_picture} name={req.follower_name || req.name} size="h-11 w-11" />
+                                                            <div className="flex-1 min-w-0">
+                                                                <p className="font-semibold text-slate-900 text-sm truncate">{req.follower_name || req.name}</p>
+                                                                <p className="text-[11px] text-slate-400 capitalize truncate mt-0.5">
+                                                                    {req.follower_role || req.role || 'Student'}{req.follower_college ? ` • ${req.follower_college}` : ''}
+                                                                </p>
+                                                            </div>
+                                                            <div className="flex gap-1.5 flex-shrink-0">
+                                                                <Tooltip content="Decline">
+                                                                    <Button variant="ghost" size="icon" onClick={() => updateFollowMutation.mutate({ followerId: req.follower_id || req.id, status: 'rejected' })} className="h-8 w-8 text-slate-400 hover:text-rose-500 hover:bg-rose-50">
+                                                                        <X className="w-4 h-4" />
+                                                                    </Button>
+                                                                </Tooltip>
+                                                                <Button size="sm" onClick={() => updateFollowMutation.mutate({ followerId: req.follower_id || req.id, status: 'accepted' })} className="bg-teal-600 hover:bg-teal-700 text-xs">
+                                                                    <Check className="w-3.5 h-3.5 mr-1" /> Accept
+                                                                </Button>
+                                                            </div>
+                                                        </CardContent>
+                                                    </Card>
+                                                </SpotlightCard>
+                                            ))}
+                                        </div>
+                                    )
+                                )}
+
+                                {/* Followers */}
+                                {networkTab === 'followers' && (
+                                    loadingFollowers ? (
+                                        <Card className="border-slate-200/80 bg-white/95">
+                                            <CardContent className="p-10 flex justify-center"><Loader2 className="w-7 h-7 animate-spin text-teal-500" /></CardContent>
+                                        </Card>
+                                    ) : networkFollowers.length === 0 ? (
+                                        <Card className="border-slate-200/80 bg-white/95">
+                                            <CardContent className="p-10 text-center">
+                                                <div className="w-14 h-14 bg-teal-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                                                    <Users className="w-7 h-7 text-teal-200" />
+                                                </div>
+                                                <p className="font-semibold text-slate-700 text-sm mb-1">No Followers Yet</p>
+                                                <p className="text-xs text-slate-400">People who follow you will appear here.</p>
+                                            </CardContent>
+                                        </Card>
+                                    ) : (
+                                        <Card className="border-slate-200/80 bg-white/95 overflow-hidden">
+                                            <div className="p-3 border-b border-slate-100 bg-slate-50/50">
+                                                <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">All Followers ({networkFollowers.length})</p>
+                                            </div>
+                                            <div className="divide-y divide-slate-100">
+                                                {networkFollowers.map(f => (
+                                                    <div key={f.id} className="p-3.5 flex items-center gap-3 hover:bg-teal-50/30 transition-colors">
+                                                        <ProfileAvatar src={f.avatar || f.profile_picture} name={f.name} size="h-10 w-10" />
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="text-sm font-semibold text-slate-900 truncate">{f.name}</p>
+                                                            <p className="text-[11px] text-slate-400 capitalize mt-0.5">{f.role}</p>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </Card>
+                                    )
+                                )}
+
+                                {/* Following */}
+                                {networkTab === 'following' && (
+                                    loadingFollowing ? (
+                                        <Card className="border-slate-200/80 bg-white/95">
+                                            <CardContent className="p-10 flex justify-center"><Loader2 className="w-7 h-7 animate-spin text-teal-500" /></CardContent>
+                                        </Card>
+                                    ) : networkFollowing.length === 0 ? (
+                                        <Card className="border-slate-200/80 bg-white/95">
+                                            <CardContent className="p-10 text-center">
+                                                <div className="w-14 h-14 bg-teal-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                                                    <UserCheck className="w-7 h-7 text-teal-200" />
+                                                </div>
+                                                <p className="font-semibold text-slate-700 text-sm mb-1">Not Following Anyone</p>
+                                                <p className="text-xs text-slate-400">People you follow will appear here.</p>
+                                            </CardContent>
+                                        </Card>
+                                    ) : (
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                            {networkFollowing.map(f => (
+                                                <SpotlightCard key={f.id} className="bg-transparent" spotlightColor="rgba(20, 184, 166, 0.08)">
+                                                    <Card className="border-slate-200/80 bg-white/95">
+                                                        <CardContent className="p-4 text-center">
+                                                            <ProfileAvatar src={f.avatar || f.profile_picture} name={f.name} size="h-12 w-12" className="mx-auto mb-2" />
+                                                            <p className="font-semibold text-slate-900 text-sm truncate">{f.name}</p>
+                                                            <p className="text-[10px] text-slate-400 capitalize mt-0.5 mb-3">{f.role}</p>
+                                                            <Button
+                                                                variant="destructive"
+                                                                size="sm"
+                                                                className="w-full text-[11px] bg-slate-900 hover:bg-rose-600"
+                                                                onClick={() => updateFollowMutation.mutate({ followerId: f.id, status: 'rejected' })}
+                                                            >
+                                                                Unfollow
+                                                            </Button>
+                                                        </CardContent>
+                                                    </Card>
+                                                </SpotlightCard>
+                                            ))}
+                                        </div>
+                                    )
+                                )}
+                            </div>
+                        )}
                     </main>
 
                     {/* ═══════════════════════════════════════════════════════ */}
@@ -730,8 +908,8 @@ const AlumniDashboard = () => {
             <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-t border-slate-200/80 z-50 lg:hidden">
                 <div className="flex items-center justify-around py-1.5 px-2 max-w-lg mx-auto">
                     {[
-                        { id: 'feed', icon: LayoutDashboard, label: 'Home', path: '/dashboard' },
-                        { id: 'network', icon: Users, label: 'Network', path: '/network' },
+                        { id: 'feed', icon: LayoutDashboard, label: 'Home', isTab: true },
+                        { id: 'network', icon: Users, label: 'Network', isTab: true },
                         { id: 'notifications', icon: Bell, label: 'Alerts', isTab: true },
                         { id: 'chat', icon: MessageSquare, label: 'Chat', path: '/chat' },
                         { id: 'settings', icon: Settings, label: 'Settings', path: '/settings' },

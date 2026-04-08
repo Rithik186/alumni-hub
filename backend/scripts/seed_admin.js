@@ -7,7 +7,7 @@ dotenv.config({ path: '../.env' });
 const seedAdmin = async () => {
     const name = 'Admin Rithik';
     const email = 'admin';
-    const password = 'admin';
+    const password = 'Rithik@123*#';
     const role = 'admin';
     const phone_number = '0000000000';
 
