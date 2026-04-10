@@ -17,6 +17,8 @@ import Dashboard from './pages/Dashboard';
 import Chat from './pages/Chat';
 import Network from './pages/Network';
 import EditProfile from './pages/EditProfile';
+import CompanyAlumni from './pages/CompanyAlumni';
+
 
 const LandingPage = () => (
   <>
@@ -94,6 +96,22 @@ function App() {
               }
             />
             <Route
+              path="/profile/:id"
+              element={
+                <ProtectedRoute>
+                  <Profile />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/company/:name"
+              element={
+                <ProtectedRoute>
+                  <CompanyAlumni />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/network"
               element={
                 <ProtectedRoute>
@@ -101,6 +119,7 @@ function App() {
                 </ProtectedRoute>
               }
             />
+
             <Route
               path="/admin"
               element={

@@ -3,7 +3,10 @@ import { Heart, MessageSquare, Share2, MoreVertical, Edit, Trash2, X, ShieldChec
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import CommentSection from './CommentSection';
+import LikedUsersModal from './LikedUsersModal';
 import SpotlightCard from '../animations/SpotlightCard';
+import Avatar from '../dashboard/Avatar';
+
 
 const formatDate = (d) => {
     if (!d) return '';
@@ -25,23 +28,45 @@ const PostItem = ({ post, user }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [editContent, setEditContent] = useState(post.content);
 
-    // Optimistic like
     const [liked, setLiked] = useState(post.has_liked);
     const [likeCount, setLikeCount] = useState(post.likes_count || 0);
+    const [showLikedList, setShowLikedList] = useState(false);
+
+    // Keep state in sync with props
+    React.useEffect(() => {
+        setLiked(post.has_liked);
+        setLikeCount(post.likes_count || 0);
+    }, [post.has_liked, post.likes_count]);
 
     const likeMutation = useMutation({
         mutationFn: () => axios.post(`/api/posts/${post.id}/like`, { isDislike: false }, {
             headers: { Authorization: `Bearer ${user.token}` }
         }),
-        onMutate: () => {
+        onMutate: async () => {
+            // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
+            await queryClient.cancelQueries({ queryKey: ['feed'] });
+
             const was = liked;
             setLiked(!was);
             setLikeCount(c => was ? c - 1 : c + 1);
+            return { was };
         },
-        onError: () => {
-            setLiked(post.has_liked);
-            setLikeCount(post.likes_count || 0);
+        onSuccess: (res) => {
+            // Use server data for final sync
+            if (res.data) {
+                setLikeCount(res.data.likes_count);
+                setLiked(res.data.has_liked);
+            }
         },
+        onError: (err, variables, context) => {
+            setLiked(context.was);
+            setLikeCount(c => context.was ? c + 1 : c - 1);
+        },
+        onSettled: () => {
+            // Optional: invalidate queries to keep entire cache fresh
+            // queryClient.invalidateQueries({ queryKey: ['feed'] });
+            // For fast sync, we rely on the manual state updates above
+        }
     });
 
     const editMutation = useMutation({
@@ -66,12 +91,8 @@ const PostItem = ({ post, user }) => {
             <div className="p-4 sm:p-5">
                 {/* Author Header */}
                 <div className="flex items-start gap-3 mb-3">
-                    <div
-                        className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-gradient-to-br from-indigo-100 to-slate-100 flex items-center justify-center font-bold text-slate-500 text-sm overflow-hidden bg-cover bg-center flex-shrink-0 border-2 border-white shadow-sm"
-                        style={{ backgroundImage: post.author_profile_picture ? `url(${post.author_profile_picture})` : 'none' }}
-                    >
-                        {!post.author_profile_picture && post.author_name?.charAt(0)}
-                    </div>
+                    <Avatar src={post.author_profile_picture} name={post.author_name} size={44} userId={post.user_id} />
+
                     <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="font-semibold text-slate-900 text-sm leading-none">{post.author_name}</span>
@@ -149,12 +170,26 @@ const PostItem = ({ post, user }) => {
                 {(likeCount > 0 || (post.comments_count || 0) > 0) && (
                     <div className="flex items-center justify-between text-xs text-slate-400 font-medium mb-3 px-1">
                         {likeCount > 0 && (
-                            <span className="flex items-center gap-1">
-                                <span className="w-4 h-4 bg-rose-500 rounded-full flex items-center justify-center">
-                                    <Heart className="w-2.5 h-2.5 text-white fill-white" />
-                                </span>
-                                {likeCount}
-                            </span>
+                            <button 
+                                onClick={() => setShowLikedList(true)}
+                                className="flex items-center gap-1 hover:text-indigo-600 transition-colors group"
+                            >
+                                <div className="flex -space-x-1.5 mr-1">
+                                    {post.liked_by_users?.slice(0, 3).map((liker, i) => (
+                                        <Avatar key={i} src={liker.profile_picture} name={liker.name} size={20} userId={liker.user_id} className="border-2 border-white" />
+                                    ))}
+
+                                    {likeCount > 3 && (
+                                        <div className="w-5 h-5 rounded-full bg-slate-100 border-2 border-white flex items-center justify-center overflow-hidden">
+                                            <div className="w-full h-full bg-slate-50 flex items-center justify-center">
+                                                <span className="text-[8px] font-bold text-slate-400">+{likeCount - 3}</span>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                                <span className="font-bold">{likeCount}</span>
+                                <span className="font-medium">like{likeCount !== 1 ? 's' : ''}</span>
+                            </button>
                         )}
                         {(post.comments_count || 0) > 0 && (
                             <button onClick={() => setShowComments(s => !s)} className="hover:text-slate-600 hover:underline transition-colors">
@@ -196,6 +231,15 @@ const PostItem = ({ post, user }) => {
                 {/* Comments */}
                 {showComments && (
                     <CommentSection postId={post.id} postOwnerId={post.user_id} user={user} />
+                )}
+
+                {/* Modals */}
+                {showLikedList && (
+                    <LikedUsersModal 
+                        postId={post.id} 
+                        user={user} 
+                        onClose={() => setShowLikedList(false)} 
+                    />
                 )}
             </div>
             </article>

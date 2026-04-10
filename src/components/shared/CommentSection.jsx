@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2, Heart, Pin, Reply, Send, X, Smile } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import Avatar from '../dashboard/Avatar';
+
 
 const QUICK_REPLIES = [
     'Congratulations! 🎉',
@@ -14,6 +17,8 @@ const QUICK_REPLIES = [
 
 const CommentSection = ({ postId, postOwnerId, user }) => {
     const queryClient = useQueryClient();
+    const navigate = useNavigate();
+
     const [text, setText] = useState('');
     const [replyTo, setReplyTo] = useState(null);
 
@@ -112,12 +117,8 @@ const CommentSection = ({ postId, postOwnerId, user }) => {
                     </div>
                 )}
                 <div className="flex gap-2 items-end">
-                    <div
-                        className="w-8 h-8 rounded-xl flex-shrink-0 bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-500 overflow-hidden bg-cover bg-center border border-slate-200/60"
-                        style={{ backgroundImage: user.profile_picture ? `url(${user.profile_picture})` : 'none' }}
-                    >
-                        {!user.profile_picture && user.name?.charAt(0)}
-                    </div>
+                    <Avatar src={user.profile_picture} name={user.name} size={32} userId={user.id} />
+
                     <div className="flex-1 flex gap-2">
                         <input
                             type="text"
@@ -146,12 +147,8 @@ const CommentSection = ({ postId, postOwnerId, user }) => {
                     {topLevel.map(c => (
                         <div key={c.id}>
                             <div className="flex gap-2.5">
-                                <div
-                                    className="w-8 h-8 rounded-xl flex-shrink-0 bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-500 overflow-hidden bg-cover bg-center border border-slate-200/60"
-                                    style={{ backgroundImage: c.user_profile_picture ? `url(${c.user_profile_picture})` : 'none' }}
-                                >
-                                    {!c.user_profile_picture && c.user_name?.charAt(0)}
-                                </div>
+                                <Avatar src={c.user_profile_picture} name={c.user_name} size={32} userId={c.user_id} />
+
                                 <div className="flex-1 min-w-0">
                                     <div className="bg-slate-50 rounded-2xl rounded-tl-sm px-3.5 py-2.5 relative group">
                                         {c.is_pinned && (
@@ -159,10 +156,11 @@ const CommentSection = ({ postId, postOwnerId, user }) => {
                                                 <Pin className="w-2.5 h-2.5 text-amber-500" />
                                             </div>
                                         )}
-                                        <p className="text-xs font-semibold text-slate-900 mb-0.5">
+                                        <p className="text-xs font-semibold text-slate-900 mb-0.5 cursor-pointer hover:text-indigo-600 transition-colors" onClick={() => navigate(`/profile/${c.user_id}`)}>
                                             {c.user_name}
                                             {c.user_role && <span className="font-normal text-slate-400 ml-1.5 text-[10px] capitalize">{c.user_role}</span>}
                                         </p>
+
                                         <p className="text-[13px] text-slate-700 leading-relaxed">{c.content}</p>
                                     </div>
                                     <div className="flex items-center gap-3.5 mt-1 px-1">
@@ -191,12 +189,8 @@ const CommentSection = ({ postId, postOwnerId, user }) => {
                                     {/* Nested Replies */}
                                     {replies.filter(r => r.parent_id === c.id).map(r => (
                                         <div key={r.id} className="flex gap-2 mt-2 ml-2">
-                                            <div
-                                                className="w-6 h-6 rounded-lg flex-shrink-0 bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-500 overflow-hidden bg-cover bg-center"
-                                                style={{ backgroundImage: r.user_profile_picture ? `url(${r.user_profile_picture})` : 'none' }}
-                                            >
-                                                {!r.user_profile_picture && r.user_name?.charAt(0)}
-                                            </div>
+                                            <Avatar src={r.user_profile_picture} name={r.user_name} size={24} userId={r.user_id} />
+
                                             <div className="flex-1 bg-slate-50/80 rounded-xl rounded-tl-sm px-3 py-2">
                                                 <p className="text-[11px] font-semibold text-slate-900 mb-0.5">{r.user_name}</p>
                                                 <p className="text-xs text-slate-600 leading-relaxed">{r.content}</p>

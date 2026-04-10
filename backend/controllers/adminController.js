@@ -38,18 +38,23 @@ export const updateApprovalStatus = async (req, res) => {
 // Get platform stats
 export const getPlatformStats = async (req, res) => {
     try {
-        const userStats = await db.query('SELECT role, count(*) FROM users GROUP BY role');
-        const mentorshipStats = await db.query('SELECT status, count(*) FROM mentorship_requests GROUP BY status');
+        const [userStats, mentorshipStats, postStats] = await Promise.all([
+            db.query('SELECT role, count(*) FROM users GROUP BY role'),
+            db.query('SELECT status, count(*) FROM mentorship_requests GROUP BY status'),
+            db.query('SELECT COUNT(*) as total_posts FROM posts')
+        ]);
 
         res.json({
             users: userStats.rows,
-            mentorships: mentorshipStats.rows
+            mentorships: mentorshipStats.rows,
+            posts: postStats.rows[0].total_posts
         });
     } catch (error) {
         console.error('Get Stats Error:', error);
         res.status(500).json({ message: 'Server error fetching stats' });
     }
 };
+
 
 // Get all users with profiles
 export const getAllUsers = async (req, res) => {
@@ -75,6 +80,7 @@ export const toggleUserStatus = async (req, res) => {
             'UPDATE users SET is_active = NOT is_active WHERE id = $1 RETURNING is_active',
             [userId]
         );
+        if (result.rows.length === 0) return res.status(404).json({ message: 'User not found' });
         res.json({ message: 'User status updated', is_active: result.rows[0].is_active });
     } catch (error) {
         console.error('Toggle User Status Error:', error);
@@ -130,6 +136,7 @@ export const createUserByAdmin = async (req, res) => {
             [name, email, password_hash, role, college]
         );
 
+        if (newUser.rows.length === 0) return res.status(500).json({ message: 'Failed to create user' });
         const userId = newUser.rows[0].id;
 
         // Initialize empty profiles

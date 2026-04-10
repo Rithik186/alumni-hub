@@ -36,11 +36,12 @@ export const createPost = async (req, res) => {
 export const getFeed = async (req, res) => {
     const userId = req.user.id;
     const { page = 1, limit = 10 } = req.query;
-    const offset = (page - 1) * limit;
+    const offset = Math.max(0, (parseInt(page) - 1) * parseInt(limit));
+    const pageSize = parseInt(limit);
 
     try {
         // Optimized Feed Query
-        // 1. We pre-fetch the user's college to avoid repeated subqueries in the CASE/WHERE
+        // 1. Pre-fetch user college safely
         const userSettings = await db.query('SELECT college FROM users WHERE id = $1', [userId]);
         const userCollege = userSettings.rows[0]?.college || null;
 
@@ -48,40 +49,55 @@ export const getFeed = async (req, res) => {
             SELECT 
                 p.id, p.user_id, p.content, p.image_url, p.video_url, p.created_at,
                 u.name as author_name, u.role as author_role, u.college as author_college, u.profile_picture as author_profile_picture,
-                COALESCE(lc.likes_count, 0) as likes_count,
-                COALESCE(dc.dislikes_count, 0) as dislikes_count,
+                COALESCE(stats.likes_count, 0) as likes_count,
+                COALESCE(stats.dislikes_count, 0) as dislikes_count,
                 COALESCE(cc.comments_count, 0) as comments_count,
                 EXISTS(SELECT 1 FROM post_likes pl WHERE pl.post_id = p.id AND pl.user_id = $1 AND pl.is_dislike = FALSE) as has_liked,
-                (SELECT COALESCE(json_agg(json_build_object('name', lu.name)), '[]'::json) 
+                (SELECT COALESCE(json_agg(json_build_object('name', lu.name, 'profile_picture', lu.profile_picture)), '[]'::json) 
                  FROM (
-                    SELECT lu2.name 
+                    SELECT lu2.name, lu2.profile_picture
                     FROM post_likes pl2 
                     JOIN users lu2 ON pl2.user_id = lu2.id 
                     WHERE pl2.post_id = p.id AND pl2.is_dislike = FALSE
+                    ORDER BY pl2.created_at DESC
                     LIMIT 5
                  ) as lu) as liked_by_users
             FROM posts p
             JOIN users u ON p.user_id = u.id
-            CROSS JOIN LATERAL (SELECT count(*) as likes_count FROM post_likes WHERE post_id = p.id AND is_dislike = FALSE) lc
-            CROSS JOIN LATERAL (SELECT count(*) as dislikes_count FROM post_likes WHERE post_id = p.id AND is_dislike = TRUE) dc
-            CROSS JOIN LATERAL (SELECT count(*) as comments_count FROM post_comments WHERE post_id = p.id) cc
+            CROSS JOIN LATERAL (
+                SELECT 
+                    COUNT(*) FILTER (WHERE is_dislike = FALSE) as likes_count,
+                    COUNT(*) FILTER (WHERE is_dislike = TRUE) as dislikes_count
+                FROM post_likes 
+                WHERE post_id = p.id
+            ) stats
+            CROSS JOIN LATERAL (
+                SELECT count(*) as comments_count FROM post_comments WHERE post_id = p.id
+            ) cc
             WHERE p.user_id = $1 
-               OR u.college = $4
+               OR (u.college IS NOT NULL AND u.college = $4)
                OR p.user_id IN (SELECT following_id FROM follows WHERE follower_id = $1 AND status = 'accepted')
             ORDER BY p.created_at DESC
             LIMIT $2 OFFSET $3
-        `, [userId, limit, offset, userCollege]);
+        `, [userId, pageSize, offset, userCollege]);
 
         res.json(feed.rows);
     } catch (err) {
-        console.error('CRITICAL: Feed loading failure:', err);
+        console.error('CRITICAL: Feed loading failure:', {
+            error: err.message,
+            stack: err.stack,
+            userId,
+            page,
+            limit
+        });
         res.status(500).json({ 
             message: 'Error loading feed', 
             error: err.message,
-            stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+            details: process.env.NODE_ENV === 'development' ? err.stack : undefined
         });
     }
 };
+
 
 export const toggleLike = async (req, res) => {
     const { postId } = req.params;
@@ -115,7 +131,35 @@ export const toggleLike = async (req, res) => {
             }
         }
 
-        res.json({ message: 'Success', action });
+        // Get updated count and status
+        const counts = await db.query(`
+            SELECT 
+                (SELECT COUNT(*) FROM post_likes WHERE post_id = $1 AND is_dislike = FALSE) as likes_count,
+                EXISTS(SELECT 1 FROM post_likes WHERE post_id = $1 AND user_id = $2 AND is_dislike = FALSE) as has_liked
+        `, [postId, userId]);
+
+        res.json({ 
+            message: 'Success', 
+            action, 
+            likes_count: parseInt(counts.rows[0].likes_count),
+            has_liked: counts.rows[0].has_liked
+        });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+};
+
+export const getPostLikes = async (req, res) => {
+    const { postId } = req.params;
+    try {
+        const likes = await db.query(`
+            SELECT u.id, u.name, u.role, u.profile_picture, u.college
+            FROM post_likes pl
+            JOIN users u ON pl.user_id = u.id
+            WHERE pl.post_id = $1 AND pl.is_dislike = FALSE
+            ORDER BY pl.created_at DESC
+        `, [postId]);
+        res.json(likes.rows);
     } catch (err) {
         res.status(500).json({ message: err.message });
     }

@@ -59,3 +59,21 @@ export const getRequests = async (req, res) => {
         res.status(500).json({ message: 'Server error fetching mentorship requests' });
     }
 };
+// Get alumni by company
+export const getAlumniByCompany = async (req, res) => {
+    const { companyName } = req.params;
+    try {
+        const result = await db.query(
+            `SELECT u.id, u.name, u.profile_picture, u.role, ap.job_role, ap.company, ap.department
+             FROM users u
+             JOIN alumni_profiles ap ON u.id = ap.user_id
+             WHERE ap.company ILIKE $1 AND u.role = 'alumni'
+             ORDER BY ap.job_role ASC`,
+            [`%${companyName}%`]
+        );
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Get Alumni By Company Error:', error);
+        res.status(500).json({ message: 'Server error fetching alumni' });
+    }
+};

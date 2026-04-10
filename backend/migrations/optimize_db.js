@@ -8,6 +8,9 @@ const runOptimization = async () => {
         console.log('Adding indexes to users table...');
         await db.query(`CREATE INDEX IF NOT EXISTS idx_users_college ON users(college);`);
         await db.query(`CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);`);
+        await db.query(`CREATE INDEX IF NOT EXISTS idx_users_approved_active ON users(is_approved, is_active);`);
+        await db.query(`CREATE INDEX IF NOT EXISTS idx_users_verified ON users(is_verified);`);
+
 
         console.log('Adding indexes to posts table...');
         await db.query(`CREATE INDEX IF NOT EXISTS idx_posts_user_id ON posts(user_id);`);
@@ -35,6 +38,12 @@ const runOptimization = async () => {
         await db.query(`CREATE INDEX IF NOT EXISTS idx_messages_sender_id ON messages(sender_id);`);
         await db.query(`CREATE INDEX IF NOT EXISTS idx_messages_receiver_id ON messages(receiver_id);`);
         await db.query(`CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at);`);
+
+        console.log('Adding indexes to mentorship_requests table...');
+        await db.query(`CREATE INDEX IF NOT EXISTS idx_mentorship_status ON mentorship_requests(status);`);
+        await db.query(`CREATE INDEX IF NOT EXISTS idx_mentorship_student_id ON mentorship_requests(student_id);`);
+        await db.query(`CREATE INDEX IF NOT EXISTS idx_mentorship_alumni_id ON mentorship_requests(alumni_id);`);
+
 
         console.log('--- Database Optimization Complete ---');
         process.exit(0);

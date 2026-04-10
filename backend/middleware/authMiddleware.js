@@ -1,29 +1,38 @@
 
 import jwt from 'jsonwebtoken';
+import db from '../config/db.js';
 
-export const protect = (req, res, next) => {
+export const protect = async (req, res, next) => {
     let token;
 
     if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
         try {
             token = req.headers.authorization.split(' ')[1];
             const decoded = jwt.verify(token, process.env.JWT_SECRET);
-            console.log('Decoded Token:', decoded);
+            
+            // Critical check: Ensure ID exists in token
+            if (!decoded || !decoded.id) {
+                return res.status(401).json({ message: 'Invalid token payload' });
+            }
 
-            // Attach user to request (In real app, fetch from DB)
-            req.user = decoded; // { id, role }
+            // Database Sync check: Ensure user still exists in DB
+            const userCheck = await db.query('SELECT id, role FROM users WHERE id = $1', [decoded.id]);
+            if (userCheck.rows.length === 0) {
+                return res.status(401).json({ message: 'User no longer exists. please login again.' });
+            }
 
+            req.user = userCheck.rows[0]; 
             next();
         } catch (error) {
-            console.error(error);
+            console.error('Auth Error:', error.message);
             res.status(401).json({ message: 'Not authorized, token failed' });
         }
     }
 
     if (!token) {
-        res.status(401).json({ message: 'Not authorized, no token' });
+        return res.status(401).json({ message: 'Not authorized, no token' });
     }
-};
+}
 
 export const adminOnly = (req, res, next) => {
     if (req.user && req.user.role === 'admin') {

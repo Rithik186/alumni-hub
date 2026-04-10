@@ -172,31 +172,94 @@ export const loginUser = async (req, res) => {
 // @access  Private
 export const getMe = async (req, res) => {
     try {
-        const userRes = await db.query('SELECT * FROM users WHERE id = $1', [req.user.id]);
+        const userRes = await db.query('SELECT id, name, email, phone_number, role, college, profile_picture, is_approved, is_verified, created_at FROM users WHERE id = $1', [req.user.id]);
         if (userRes.rows.length === 0) return res.status(404).json({ message: 'User not found' });
         
+        const user = userRes.rows[0];
         let profile = null;
-        if (userRes.rows[0].role === 'student') {
+        if (user.role === 'student') {
             const spRes = await db.query('SELECT * FROM student_profiles WHERE user_id = $1', [req.user.id]);
             profile = spRes.rows[0];
-        } else if (userRes.rows[0].role === 'alumni') {
+        } else if (user.role === 'alumni') {
             const apRes = await db.query('SELECT * FROM alumni_profiles WHERE user_id = $1', [req.user.id]);
             profile = apRes.rows[0];
         }
-        
-        const user = userRes.rows[0];
-        delete user.password_hash;
-        res.json({ ...user, profile });
 
+        res.json({ ...user, profile });
     } catch (error) {
-        console.error('CRITICAL: Get Profile Error:', error);
-        res.status(500).json({ 
-            message: 'Server error fetching profile', 
-            error: error.message,
-            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-        });
+        console.error('Get Me Error:', error);
+        res.status(500).json({ message: 'Server error fetching user details' });
     }
 };
+
+// @desc    Get any user profile by ID
+
+// @route   GET /api/auth/profile/:id
+// @access  Private
+export const getUserProfile = async (req, res) => {
+    const { id } = req.params;
+    const requesterId = req.user.id;
+
+    try {
+        const userRes = await db.query('SELECT id, name, email, phone_number, role, college, profile_picture, is_approved, created_at FROM users WHERE id = $1', [id]);
+        if (userRes.rows.length === 0) return res.status(404).json({ message: 'User not found' });
+        
+        const user = userRes.rows[0];
+        let profile = null;
+        if (user.role === 'student') {
+            const spRes = await db.query('SELECT * FROM student_profiles WHERE user_id = $1', [id]);
+            profile = spRes.rows[0];
+        } else if (user.role === 'alumni') {
+            const apRes = await db.query('SELECT * FROM alumni_profiles WHERE user_id = $1', [id]);
+            profile = apRes.rows[0];
+        }
+
+        // Check connection status
+        const followStatusRes = await db.query('SELECT status FROM follows WHERE follower_id = $1 AND following_id = $2', [requesterId, id]);
+        const followStatus = followStatusRes.rows[0]?.status || 'none';
+        
+        const backFollowRes = await db.query('SELECT status FROM follows WHERE follower_id = $1 AND following_id = $2', [id, requesterId]);
+        const isMutual = followStatus === 'accepted' && backFollowRes.rows[0]?.status === 'accepted';
+
+        // Privacy Logic: Show limited if not connected
+        const isOwner = requesterId === parseInt(id);
+        const canViewFull = isOwner || isMutual || followStatus === 'accepted'; // Grant some visibility if accepted follow exists
+
+        if (!canViewFull) {
+            // Limited data
+            return res.json({
+                id: user.id,
+                name: user.name,
+                role: user.role,
+                college: user.college,
+                profile_picture: user.profile_picture,
+                is_approved: user.is_approved,
+                created_at: user.created_at,
+                profile: {
+                    job_role: profile?.job_role,
+                    company: profile?.company,
+                    department: profile?.department,
+                    bio: 'Locked! Connect to view full profile.',
+                    skills: [] // Empty skills
+                },
+                connectionStatus: { status: followStatus, isMutual },
+                isLimited: true
+            });
+        }
+
+        res.json({ 
+            ...user, 
+            profile, 
+            connectionStatus: { status: followStatus, isMutual },
+            isLimited: false
+        });
+
+    } catch (error) {
+        console.error('Get User Profile Error:', error);
+        res.status(500).json({ message: 'Server error fetching user profile' });
+    }
+};
+
 // @desc    Request OTP for password reset
 // @route   POST /api/auth/forgot-password
 // @access  Public

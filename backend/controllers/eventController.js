@@ -1,11 +1,18 @@
 import db from '../config/db.js';
 
-// Get all upcoming events
+// Get all upcoming events with alumni count insights
 export const getEvents = async (req, res) => {
     try {
         const result = await db.query(
-            'SELECT * FROM events WHERE date >= CURRENT_TIMESTAMP ORDER BY date ASC'
+            `SELECT e.*, 
+                    (SELECT COUNT(*) 
+                     FROM alumni_profiles ap 
+                     WHERE ap.company ILIKE (e.metadata->>'company')
+                    ) as alumni_count
+             FROM events e 
+             ORDER BY date DESC`
         );
+
         res.json(result.rows);
     } catch (error) {
         console.error('Get Events Error:', error);
@@ -13,15 +20,16 @@ export const getEvents = async (req, res) => {
     }
 };
 
+
 // Create a new event (Admin only)
 export const createEvent = async (req, res) => {
-    const { title, description, date, type } = req.body;
+    const { title, description, date, type, metadata = {} } = req.body;
     const created_by = req.user.id;
 
     try {
         const result = await db.query(
-            'INSERT INTO events (title, description, date, type, created_by) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-            [title, description, date, type, created_by]
+            'INSERT INTO events (title, description, date, type, metadata, created_by) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+            [title, description, date, type, typeof metadata === 'string' ? metadata : JSON.stringify(metadata), created_by]
         );
         res.status(201).json(result.rows[0]);
     } catch (error) {
@@ -29,6 +37,7 @@ export const createEvent = async (req, res) => {
         res.status(500).json({ message: 'Server error creating event' });
     }
 };
+
 
 // Delete an event (Admin only)
 export const deleteEvent = async (req, res) => {

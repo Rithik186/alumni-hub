@@ -25,7 +25,8 @@ const AdminDashboard = () => {
     
     // Form States
     const [userForm, setUserForm] = useState({ name: '', email: '', password: '', role: 'student', college: '' });
-    const [eventForm, setEventForm] = useState({ title: '', description: '', date: '', type: 'general' });
+    const [eventForm, setEventForm] = useState({ title: '', description: '', date: '', type: 'general', metadata: {} });
+
 
     // Fetch All Admin Data
     const { data: adminData, isLoading, isError, refetch } = useQuery({
@@ -105,7 +106,8 @@ const AdminDashboard = () => {
         onSuccess: () => {
             queryClient.invalidateQueries(['adminDashboardData']);
             setIsEventModalOpen(false);
-            setEventForm({ title: '', description: '', date: '', type: 'general' });
+            setEventForm({ title: '', description: '', date: '', type: 'general', metadata: {} });
+
             toast.success('Event published successfully');
         }
     });
@@ -237,13 +239,15 @@ const AdminDashboard = () => {
                 {activeTab === 'overview' ? (
                     <div className="space-y-12">
                         {/* Statistics Grid */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                             {[
                                 { label: 'Total Users', value: users.length, icon: Users, color: 'indigo' },
+                                { label: 'Platform Posts', value: stats.posts || 0, icon: Megaphone, color: 'purple' },
                                 { label: 'Pending Approvals', value: pending.length, icon: Clock, color: 'amber' },
                                 { label: 'Active Students', value: users.filter(u => u.role === 'student').length, icon: GraduationCap, color: 'blue' },
                                 { label: 'Active Alumni', value: users.filter(u => u.role === 'alumni').length, icon: Briefcase, color: 'emerald' }
                             ].map((s, i) => (
+
                                 <div key={i} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
                                     <div className="flex items-center justify-between mb-4">
                                         <div className={`w-12 h-12 rounded-2xl bg-${s.color}-50 text-${s.color}-600 flex items-center justify-center`}>
@@ -514,46 +518,125 @@ const AdminDashboard = () => {
                             initial={{ opacity: 0, scale: 0.95, y: 20 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                            className="bg-white w-full max-w-xl rounded-[32px] shadow-2xl relative z-10 overflow-hidden"
+                            className="bg-white w-full max-w-2xl rounded-[32px] shadow-2xl relative z-10 overflow-hidden"
                         >
-                            <div className="p-10">
-                                <div className="flex items-center justify-between mb-10">
-                                    <h3 className="text-2xl font-bold text-slate-900 tracking-tight">Post New Event</h3>
+                            <div className="p-10 max-h-[90vh] overflow-y-auto custom-scrollbar">
+                                <div className="flex items-center justify-between mb-8">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center">
+                                            <Calendar className="w-6 h-6" />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-2xl font-bold text-slate-900 tracking-tight">Post New Event</h3>
+                                            <p className="text-slate-500 text-xs font-medium">Broadcast opportunities to the community</p>
+                                        </div>
+                                    </div>
                                     <button onClick={() => setIsEventModalOpen(false)} className="w-10 h-10 bg-slate-50 text-slate-400 rounded-full flex items-center justify-center hover:bg-red-50 hover:text-red-500 transition-all"><X className="w-5 h-5" /></button>
                                 </div>
                                 <form className="space-y-6" onSubmit={(e) => { e.preventDefault(); eventMutation.mutate(eventForm); }}>
                                     <div className="space-y-2">
                                         <label className="text-xs font-bold text-slate-700 ml-1">Event Title</label>
-                                        <input type="text" className="w-full h-13 bg-slate-50 border border-slate-200 rounded-2xl px-5 text-sm font-medium focus:ring-4 focus:ring-indigo-50 focus:border-indigo-500 outline-none transition-all" required value={eventForm.title} onChange={(e) => setEventForm({ ...eventForm, title: e.target.value })} />
+                                        <input type="text" placeholder="e.g., Annual Tech Symposium 2026" className="w-full h-13 bg-slate-50 border border-slate-200 rounded-2xl px-5 text-sm font-medium focus:ring-4 focus:ring-indigo-50 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400" required value={eventForm.title} onChange={(e) => setEventForm({ ...eventForm, title: e.target.value })} />
                                     </div>
                                     <div className="grid grid-cols-2 gap-6">
                                         <div className="space-y-2">
-                                            <label className="text-xs font-bold text-slate-700 ml-1">Event Date</label>
+                                            <label className="text-xs font-bold text-slate-700 ml-1">Event Date & Time</label>
                                             <input type="datetime-local" className="w-full h-13 bg-slate-50 border border-slate-200 rounded-2xl px-5 text-sm font-medium focus:ring-4 focus:ring-indigo-50 focus:border-indigo-500 outline-none transition-all" required value={eventForm.date} onChange={(e) => setEventForm({ ...eventForm, date: e.target.value })} />
                                         </div>
                                         <div className="space-y-2">
-                                            <label className="text-xs font-bold text-slate-700 ml-1">Category</label>
-                                            <select className="w-full h-13 bg-slate-50 border border-slate-200 rounded-2xl px-5 text-sm font-medium focus:ring-4 focus:ring-indigo-50 focus:border-indigo-500 outline-none transition-all appearance-none" value={eventForm.type} onChange={(e) => setEventForm({ ...eventForm, type: e.target.value })}>
-                                                <option value="general">General Broadcast</option>
-                                                <option value="training">Technical Training</option>
-                                                <option value="placement">Placement Drive</option>
-                                                <option value="alumni_meet">Alumni Meetup</option>
-                                            </select>
+                                            <label className="text-xs font-bold text-slate-700 ml-1">Event Category</label>
+                                            <div className="relative">
+                                                <select className="w-full h-13 bg-slate-50 border border-slate-200 rounded-2xl px-5 pr-10 text-sm font-medium focus:ring-4 focus:ring-indigo-50 focus:border-indigo-500 outline-none transition-all appearance-none" value={eventForm.type} onChange={(e) => setEventForm({ ...eventForm, type: e.target.value, metadata: {} })}>
+                                                    <option value="general">General Broadcast</option>
+                                                    <option value="training">Technical Training</option>
+                                                    <option value="job">Job Opening</option>
+                                                    <option value="internship">Internship Opportunity</option>
+                                                    <option value="alumni_meet">Alumni Meetup</option>
+                                                </select>
+
+                                                <Filter className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                                            </div>
                                         </div>
                                     </div>
+
+                                    {/* Dynamic Fields Based on Category */}
+                                    <AnimatePresence mode="wait">
+                                        {['placement', 'job', 'internship'].includes(eventForm.type) && (
+
+                                            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="space-y-4 pt-4 border-t border-slate-100">
+                                                <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest bg-indigo-50 inline-block px-2 py-1 rounded">Placement Details</p>
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div className="space-y-1.5">
+                                                        <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Company Name</label>
+                                                        <input type="text" placeholder="e.g., Google" className="w-full h-11 bg-white border border-slate-200 rounded-xl px-4 text-sm font-medium focus:border-indigo-500 outline-none" required value={eventForm.metadata.company || ''} onChange={(e) => setEventForm({ ...eventForm, metadata: { ...eventForm.metadata, company: e.target.value } })} />
+                                                    </div>
+                                                    <div className="space-y-1.5">
+                                                        <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Job Role</label>
+                                                        <input type="text" placeholder="e.g., Software Engineer" className="w-full h-11 bg-white border border-slate-200 rounded-xl px-4 text-sm font-medium focus:border-indigo-500 outline-none" required value={eventForm.metadata.role || ''} onChange={(e) => setEventForm({ ...eventForm, metadata: { ...eventForm.metadata, role: e.target.value } })} />
+                                                    </div>
+                                                    <div className="space-y-1.5">
+                                                        <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Salary Package (LPA)</label>
+                                                        <input type="text" placeholder="e.g., 12 - 18 LPA" className="w-full h-11 bg-white border border-slate-200 rounded-xl px-4 text-sm font-medium focus:border-indigo-500 outline-none" value={eventForm.metadata.salary || ''} onChange={(e) => setEventForm({ ...eventForm, metadata: { ...eventForm.metadata, salary: e.target.value } })} />
+                                                    </div>
+                                                    <div className="space-y-1.5">
+                                                        <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Location</label>
+                                                        <input type="text" placeholder="e.g., Bangalore / Remote" className="w-full h-11 bg-white border border-slate-200 rounded-xl px-4 text-sm font-medium focus:border-indigo-500 outline-none" value={eventForm.metadata.location || ''} onChange={(e) => setEventForm({ ...eventForm, metadata: { ...eventForm.metadata, location: e.target.value } })} />
+                                                    </div>
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Eligibility Criteria</label>
+                                                    <input type="text" placeholder="e.g., B.Tech CSE/IT 2026 Batch, 7.5+ CGPA" className="w-full h-11 bg-white border border-slate-200 rounded-xl px-4 text-sm font-medium focus:border-indigo-500 outline-none" value={eventForm.metadata.eligibility || ''} onChange={(e) => setEventForm({ ...eventForm, metadata: { ...eventForm.metadata, eligibility: e.target.value } })} />
+                                                </div>
+                                            </motion.div>
+                                        )}
+
+                                        {eventForm.type === 'training' && (
+                                            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="space-y-4 pt-4 border-t border-slate-100">
+                                                <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest bg-emerald-50 inline-block px-2 py-1 rounded">Workshop Details</p>
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div className="space-y-1.5">
+                                                        <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Speaker / Mentor</label>
+                                                        <input type="text" placeholder="e.g., John Doe (Staff Engineer)" className="w-full h-11 bg-white border border-slate-200 rounded-xl px-4 text-sm font-medium focus:border-emerald-500 outline-none" value={eventForm.metadata.speaker || ''} onChange={(e) => setEventForm({ ...eventForm, metadata: { ...eventForm.metadata, speaker: e.target.value } })} />
+                                                    </div>
+                                                    <div className="space-y-1.5">
+                                                        <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Topic / Technology</label>
+                                                        <input type="text" placeholder="e.g., System Design / AWS" className="w-full h-11 bg-white border border-slate-200 rounded-xl px-4 text-sm font-medium focus:border-emerald-500 outline-none" value={eventForm.metadata.topic || ''} onChange={(e) => setEventForm({ ...eventForm, metadata: { ...eventForm.metadata, topic: e.target.value } })} />
+                                                    </div>
+                                                </div>
+                                            </motion.div>
+                                        )}
+
+                                        {eventForm.type === 'alumni_meet' && (
+                                            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="space-y-4 pt-4 border-t border-slate-100">
+                                                <p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest bg-amber-50 inline-block px-2 py-1 rounded">Meetup Details</p>
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div className="space-y-1.5">
+                                                        <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Venue / Platform</label>
+                                                        <input type="text" placeholder="e.g., Main Auditorium / Zoom" className="w-full h-11 bg-white border border-slate-200 rounded-xl px-4 text-sm font-medium focus:border-amber-500 outline-none" value={eventForm.metadata.venue || ''} onChange={(e) => setEventForm({ ...eventForm, metadata: { ...eventForm.metadata, venue: e.target.value } })} />
+                                                    </div>
+                                                    <div className="space-y-1.5">
+                                                        <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Target Batch</label>
+                                                        <input type="text" placeholder="e.g., 2018 - 2022 Batches" className="w-full h-11 bg-white border border-slate-200 rounded-xl px-4 text-sm font-medium focus:border-amber-500 outline-none" value={eventForm.metadata.batch || ''} onChange={(e) => setEventForm({ ...eventForm, metadata: { ...eventForm.metadata, batch: e.target.value } })} />
+                                                    </div>
+                                                </div>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+
                                     <div className="space-y-2">
-                                        <label className="text-xs font-bold text-slate-700 ml-1">Description</label>
-                                        <textarea className="w-full p-5 bg-slate-50 border border-slate-200 rounded-3xl text-sm font-medium min-h-[140px] focus:ring-4 focus:ring-indigo-50 focus:border-indigo-500 outline-none transition-all" required value={eventForm.description} onChange={(e) => setEventForm({ ...eventForm, description: e.target.value })} />
+                                        <label className="text-xs font-bold text-slate-700 ml-1">About the Event</label>
+                                        <textarea className="w-full p-5 bg-slate-50 border border-slate-200 rounded-3xl text-sm font-medium min-h-[120px] focus:ring-4 focus:ring-indigo-50 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400" placeholder="Provide a detailed description of the event..." required value={eventForm.description} onChange={(e) => setEventForm({ ...eventForm, description: e.target.value })} />
                                     </div>
-                                    <button type="submit" disabled={eventMutation.isPending} className="w-full bg-slate-900 py-4 rounded-2xl text-white font-bold text-sm flex items-center justify-center gap-3 hover:bg-slate-800 transition-all shadow-xl shadow-slate-100 active:scale-[0.98] mt-4">
-                                        {eventMutation.isPending ? 'Posting event...' : 'Publish Event'}
-                                        <Calendar className="w-4 h-4" />
+                                    <button type="submit" disabled={eventMutation.isPending} className="w-full bg-slate-900 py-4.5 rounded-2xl text-white font-bold text-sm flex items-center justify-center gap-3 hover:bg-slate-800 transition-all shadow-xl shadow-slate-100 active:scale-[0.98] mt-4">
+                                        {eventMutation.isPending ? 'Publishing Event...' : 'Publish Event to Platform'}
+                                        <Check className="w-4 h-4" />
                                     </button>
                                 </form>
                             </div>
                         </motion.div>
                     </div>
                 )}
+
             </AnimatePresence>
         </div>
     );

@@ -48,11 +48,15 @@ app.get('/api/health', (req, res) => {
     res.status(200).json({ status: 'active', message: 'Alumned In server is running' });
 });
 
-
 // Error Handling Middleware
 app.use((err, req, res, next) => {
+    console.error('SERVER ERROR:', err.message);
     console.error(err.stack);
-    res.status(500).send('Something broke!');
+    res.status(500).json({ 
+        message: 'Something broke!', 
+        error: err.message,
+        stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
 });
 
 export default app;

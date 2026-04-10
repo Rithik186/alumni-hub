@@ -146,6 +146,9 @@ export const getSuggestions = async (req, res) => {
     const userId = req.user.id;
     try {
         const userRes = await db.query('SELECT college, role FROM users WHERE id = $1', [userId]);
+        if (userRes.rows.length === 0) {
+            return res.status(404).json({ message: 'User not found in platform' });
+        }
         const { college, role } = userRes.rows[0];
 
         let query;
@@ -182,17 +185,35 @@ export const getSuggestions = async (req, res) => {
 
 // Internal mapping for search results to show requested status
 export const getMyFollowingsStatuses = async (req, res) => {
-    const userId = req.user.id;
+    const userId = req.user?.id;
+    if (!userId) {
+        return res.status(401).json({ message: 'User ID missing from token' });
+    }
+
     try {
         const result = await db.query('SELECT following_id, status FROM follows WHERE follower_id = $1', [userId]);
         const mapping = {};
-        result.rows.forEach(r => mapping[r.following_id] = r.status);
+        
+        if (result.rows && result.rows.length > 0) {
+            result.rows.forEach(r => {
+                if (r.following_id) {
+                    mapping[r.following_id] = r.status;
+                }
+            });
+        }
+        
         res.json(mapping);
     } catch (err) {
-        console.error('CRITICAL: My Followings Status Error:', err);
+        console.error('CRITICAL: My Followings Status Error:', {
+            message: err.message,
+            stack: err.stack,
+            userId
+        });
         res.status(500).json({ 
             message: 'Error fetching following statuses',
-            error: err.message
+            error: err.message,
+            details: process.env.NODE_ENV === 'development' ? err.stack : undefined
         });
     }
 };
+
