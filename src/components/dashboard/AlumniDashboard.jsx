@@ -300,7 +300,7 @@ const AlumniDashboard = () => {
     const { data: eventsList = [] } = useQuery({
         queryKey: ['events'],
         queryFn: async () => (await axios.get('/api/events', authHeader(user.token))).data,
-        staleTime: 5 * 60 * 1000,
+        staleTime: 10 * 1000,
     });
 
     // ── Network Queries (loaded when network tab is active) ──────────────
@@ -546,7 +546,7 @@ const AlumniDashboard = () => {
                                         <button onClick={() => setEventFilters({...eventFilters, status: 'upcoming'})} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${eventFilters.status === 'upcoming' ? 'bg-teal-600 text-white shadow-lg shadow-teal-100' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}>Upcoming</button>
                                         <button onClick={() => setEventFilters({...eventFilters, status: 'completed'})} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${eventFilters.status === 'completed' ? 'bg-teal-600 text-white shadow-lg shadow-teal-100' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}>Completed</button>
                                         <div className="h-8 w-[1px] bg-slate-200 mx-1" />
-                                        {['all', 'job', 'internship', 'training', 'alumni_meet'].map(cat => (
+                                        {['all', 'placement', 'job', 'internship', 'training', 'alumni_meet'].map(cat => (
                                             <button key={cat} onClick={() => setEventFilters({...eventFilters, category: cat})} className={`px-4 py-2 rounded-xl text-xs font-bold capitalize transition-all ${eventFilters.category === cat ? 'bg-slate-900 text-white' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}>
                                                 {cat.replace('_', ' ')}
                                             </button>
@@ -595,7 +595,11 @@ const AlumniDashboard = () => {
                                     {eventsList.filter(e => {
                                         const now = new Date();
                                         const eventDate = new Date(e.date);
-                                        const matchesStatus = eventFilters.status === 'upcoming' ? eventDate >= now : eventDate < now;
+                                        // Allow a 6-hour grace period for events to stay in 'upcoming'
+                                        const gracePeriod = 6 * 60 * 60 * 1000;
+                                        const matchesStatus = eventFilters.status === 'upcoming' 
+                                            ? (eventDate.getTime() + gracePeriod) >= now.getTime() 
+                                            : (eventDate.getTime() + gracePeriod) < now.getTime();
                                         const matchesCategory = eventFilters.category === 'all' || e.type === eventFilters.category;
                                         const matchesCompany = !eventFilters.company || e.metadata?.company?.toLowerCase().includes(eventFilters.company.toLowerCase());
                                         const matchesRole = !eventFilters.role || e.metadata?.role?.toLowerCase().includes(eventFilters.role.toLowerCase());
@@ -618,7 +622,10 @@ const AlumniDashboard = () => {
                                         eventsList.filter(e => {
                                             const now = new Date();
                                             const eventDate = new Date(e.date);
-                                            const matchesStatus = eventFilters.status === 'upcoming' ? eventDate >= now : eventDate < now;
+                                            const gracePeriod = 6 * 60 * 60 * 1000;
+                                            const matchesStatus = eventFilters.status === 'upcoming' 
+                                                ? (eventDate.getTime() + gracePeriod) >= now.getTime() 
+                                                : (eventDate.getTime() + gracePeriod) < now.getTime();
                                             const matchesCategory = eventFilters.category === 'all' || e.type === eventFilters.category;
                                             const matchesCompany = !eventFilters.company || e.metadata?.company?.toLowerCase().includes(eventFilters.company.toLowerCase());
                                             const matchesRole = !eventFilters.role || e.metadata?.role?.toLowerCase().includes(eventFilters.role.toLowerCase());
@@ -836,7 +843,7 @@ const AlumniDashboard = () => {
                                                 <SpotlightCard key={req.follower_id || req.id} className="bg-transparent" spotlightColor="rgba(20, 184, 166, 0.08)">
                                                     <Card className="border-slate-200/80 bg-white/95">
                                                         <CardContent className="p-4 flex items-center gap-3">
-                                                            <ProfileAvatar src={req.profile_picture} name={req.follower_name || req.name} size="h-11 w-11" />
+                                                            <AvatarShared src={req.profile_picture} name={req.follower_name || req.name} size={44} userId={req.follower_id || req.id} />
                                                             <div className="flex-1 min-w-0">
                                                                 <p className="font-semibold text-slate-900 text-sm truncate">{req.follower_name || req.name}</p>
                                                                 <p className="text-[11px] text-slate-400 capitalize truncate mt-0.5">
@@ -885,7 +892,7 @@ const AlumniDashboard = () => {
                                             <div className="divide-y divide-slate-100">
                                                 {networkFollowers.map(f => (
                                                     <div key={f.id} className="p-3.5 flex items-center gap-3 hover:bg-teal-50/30 transition-colors">
-                                                        <ProfileAvatar src={f.avatar || f.profile_picture} name={f.name} size="h-10 w-10" />
+                                                        <AvatarShared src={f.avatar || f.profile_picture} name={f.name} size={40} userId={f.id} />
                                                         <div className="flex-1 min-w-0">
                                                             <p className="text-sm font-semibold text-slate-900 truncate">{f.name}</p>
                                                             <p className="text-[11px] text-slate-400 capitalize mt-0.5">{f.role}</p>
@@ -919,7 +926,7 @@ const AlumniDashboard = () => {
                                                 <SpotlightCard key={f.id} className="bg-transparent" spotlightColor="rgba(20, 184, 166, 0.08)">
                                                     <Card className="border-slate-200/80 bg-white/95">
                                                         <CardContent className="p-4 text-center">
-                                                            <ProfileAvatar src={f.avatar || f.profile_picture} name={f.name} size="h-12 w-12" className="mx-auto mb-2" />
+                                                            <AvatarShared src={f.avatar || f.profile_picture} name={f.name} size={48} userId={f.id} className="mx-auto mb-2" />
                                                             <p className="font-semibold text-slate-900 text-sm truncate">{f.name}</p>
                                                             <p className="text-[10px] text-slate-400 capitalize mt-0.5 mb-3">{f.role}</p>
                                                             <Button
@@ -963,7 +970,7 @@ const AlumniDashboard = () => {
                                         <ScrollArea className="space-y-3 max-h-[240px]">
                                             {followRequests.slice(0, 4).map(req => (
                                                 <div key={req.id} className="flex items-center gap-2.5 mb-3">
-                                                    <ProfileAvatar src={req.profile_picture} name={req.name} size="h-9 w-9" />
+                                                    <AvatarShared src={req.follower_avatar || req.profile_picture} name={req.follower_name || req.name} size={36} userId={req.follower_id || req.id} />
                                                     <div className="flex-1 min-w-0">
                                                         <p className="text-[13px] font-semibold text-slate-900 truncate leading-none">{req.name}</p>
                                                         <p className="text-[11px] text-slate-400 truncate mt-0.5">{req.job_role || 'Student'}</p>
@@ -1093,7 +1100,7 @@ const AlumniDashboard = () => {
                                         <ScrollArea className="space-y-2.5 max-h-[200px]">
                                             {myPosts.slice(0, 4).map(p => (
                                                 <div key={p.id} className="flex items-start gap-2.5 mb-2.5">
-                                                    <ProfileAvatar src={p.author_profile_picture} name={p.author_name} size="h-7 w-7" className="mt-0.5" />
+                                                    <AvatarShared src={p.author_profile_picture} name={p.author_name} size={28} userId={p.user_id} className="mt-0.5" />
                                                     <div className="flex-1 min-w-0">
                                                         <p className="text-[11px] text-slate-700 leading-snug">
                                                             <span className="font-semibold text-slate-900">{p.author_name}</span>{' '}

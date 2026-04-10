@@ -4,7 +4,8 @@ import {
     Building2, ArrowLeft, Users, Briefcase, 
     MapPin, UserPlus, Search, Filter,
     LayoutGrid, List, Sparkles, ChevronRight,
-    CheckCircle2, Loader2, MessageSquare, UserCheck
+    CheckCircle2, Loader2, MessageSquare, UserCheck,
+    School, GraduationCap, RefreshCw
 } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import Navbar from '../components/landing/Navbar';
@@ -12,6 +13,8 @@ import FadeContent from '../components/animations/FadeContent';
 import Avatar from '../components/dashboard/Avatar';
 import SpotlightCard from '../components/animations/SpotlightCard';
 import { Badge } from '../components/ui/badge';
+import { toast } from 'react-hot-toast';
+import { tamilNaduColleges, engineeringDepartments, collegeSpecificDepartments } from '../data/colleges';
 
 const CompanyAlumni = () => {
     const { name: companyName } = useParams();
@@ -21,7 +24,37 @@ const CompanyAlumni = () => {
     const [alumni, setAlumni] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
+    const [filters, setFilters] = useState({
+        college: '',
+        department: '',
+        batch: '',
+        skills: '',
+        jobRole: '',
+        company: companyName // Pre-fill with the current company
+    });
+    const [showFilters, setShowFilters] = useState(true);
+    const [showCollegeSuggestions, setShowCollegeSuggestions] = useState(false);
+    const [showDeptSuggestions, setShowDeptSuggestions] = useState(false);
     const [followStatus, setFollowStatus] = useState({}); // { userId: 'none' | 'pending' | 'accepted' }
+
+    const collegeSuggestions = React.useMemo(() => {
+        if (!filters.college) return [];
+        return tamilNaduColleges.filter(c => 
+            c.toLowerCase().includes(filters.college.toLowerCase())
+        ).slice(0, 8);
+    }, [filters.college]);
+
+    const deptSuggestions = React.useMemo(() => {
+        if (!filters.department) return [];
+        const collegeName = (filters.college || '').trim();
+        // Exact match or contains for Sri Shakthi check
+        const isSriShakthi = collegeName.includes('Sri Shakthi Institute of Engineering and Technology');
+        const baseList = isSriShakthi ? collegeSpecificDepartments["Sri Shakthi Institute of Engineering and Technology (Autonomous)"] : engineeringDepartments;
+        
+        return baseList.filter(d => 
+            d.toLowerCase().includes(filters.department.toLowerCase())
+        ).slice(0, 8);
+    }, [filters.department, filters.college]);
 
     useEffect(() => {
         fetchAlumni();
@@ -61,10 +94,43 @@ const CompanyAlumni = () => {
         }
     };
 
-    const filteredAlumni = alumni.filter(a => 
-        a.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-        a.job_role?.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    const filteredAlumni = alumni.filter(a => {
+        const query = searchQuery?.toLowerCase().trim();
+        const matchesSearch = !query || 
+            (a.name?.toLowerCase().includes(query)) || 
+            (a.job_role?.toLowerCase().includes(query));
+        
+        const fCollege = filters.college?.toLowerCase().trim();
+        const matchesCollege = !fCollege || (a.college?.toLowerCase().includes(fCollege));
+        
+        const fDept = filters.department?.toLowerCase().trim();
+        const matchesDept = !fDept || (a.department?.toLowerCase().includes(fDept));
+        
+        const fBatch = filters.batch?.trim();
+        const matchesBatch = !fBatch || (a.batch?.toString().includes(fBatch));
+        
+        const fRole = filters.jobRole?.toLowerCase().trim();
+        const matchesRole = !fRole || (a.job_role?.toLowerCase().includes(fRole));
+        
+        const fCompany = filters.company?.toLowerCase().trim();
+        const matchesCompany = !fCompany || (a.company?.toLowerCase().includes(fCompany));
+        
+        const fSkills = filters.skills?.toLowerCase().trim();
+        let matchesSkills = true;
+        if (fSkills) {
+            matchesSkills = a.skills && Array.isArray(a.skills) && a.skills.some(s => s.toLowerCase().includes(fSkills));
+        }
+
+        return matchesSearch && matchesCollege && matchesDept && matchesBatch && matchesRole && matchesCompany && matchesSkills;
+    });
+
+    const handleMessageClick = (personId) => {
+        if (followStatus[personId] !== 'accepted') {
+            toast.error("Please follow this alumni first to start a conversation!");
+            return;
+        }
+        navigate('/chat');
+    };
 
     return (
         <div className="min-h-screen bg-slate-50/50">
@@ -100,16 +166,129 @@ const CompanyAlumni = () => {
                     </div>
                 </FadeContent>
 
-                {/* Search Bar */}
-                <div className="relative mb-8">
-                    <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                    <input 
-                        type="text" 
-                        placeholder={`Search alumni working at ${companyName}...`} 
-                        className="w-full h-16 pl-14 pr-6 bg-white border border-slate-200 rounded-[24px] text-sm font-bold shadow-sm focus:ring-4 focus:ring-indigo-50 focus:border-indigo-200 outline-none transition-all"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                    />
+                {/* Search & Filters */}
+                <div className="bg-white rounded-[32px] border border-slate-200/60 p-6 shadow-sm mb-8">
+                    <div className="relative mb-6">
+                        <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                        <input 
+                            type="text" 
+                            placeholder={`Search alumni by name or role...`} 
+                            className="w-full h-14 pl-14 pr-6 bg-slate-50 border border-slate-200/60 rounded-2xl text-sm font-bold focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 focus:bg-white outline-none transition-all"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Company</label>
+                            <input 
+                                type="text" 
+                                placeholder="Filter company..." 
+                                className="w-full h-11 px-4 bg-slate-50 border border-slate-200/60 rounded-xl text-xs font-bold focus:ring-2 focus:ring-indigo-500/10 outline-none"
+                                value={filters.company}
+                                onChange={(e) => setFilters({...filters, company: e.target.value})}
+                            />
+                        </div>
+                        <div className="space-y-1.5 relative">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">College Name</label>
+                            <input 
+                                type="text" 
+                                placeholder="Search college..." 
+                                className="w-full h-11 px-4 bg-slate-50 border border-slate-200/60 rounded-xl text-xs font-bold focus:ring-2 focus:ring-indigo-500/10 outline-none"
+                                value={filters.college}
+                                onChange={(e) => setFilters({...filters, college: e.target.value})}
+                                onFocus={() => setShowCollegeSuggestions(true)}
+                                onBlur={() => setTimeout(() => setShowCollegeSuggestions(false), 200)}
+                            />
+                            {showCollegeSuggestions && collegeSuggestions.length > 0 && (
+                                <div className="absolute z-[100] top-full mt-2 w-[120%] left-0 bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden py-2">
+                                    {collegeSuggestions.map((college, idx) => (
+                                        <button
+                                            key={idx}
+                                            type="button"
+                                            onClick={() => {
+                                                setFilters({ ...filters, college });
+                                                setShowCollegeSuggestions(false);
+                                            }}
+                                            className="w-full text-left px-4 py-2.5 text-[11px] text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 transition-colors flex items-center gap-3 font-bold"
+                                        >
+                                            <GraduationCap className="w-3.5 h-3.5 text-slate-300" />
+                                            {college}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                        <div className="space-y-1.5 relative">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Branch / Dept</label>
+                            <input 
+                                type="text" 
+                                placeholder="e.g. Computer Science..." 
+                                className="w-full h-11 px-4 bg-slate-50 border border-slate-200/60 rounded-xl text-xs font-bold focus:ring-2 focus:ring-indigo-500/10 outline-none"
+                                value={filters.department}
+                                onChange={(e) => setFilters({...filters, department: e.target.value})}
+                                onFocus={() => setShowDeptSuggestions(true)}
+                                onBlur={() => setTimeout(() => setShowDeptSuggestions(false), 200)}
+                            />
+                            {showDeptSuggestions && deptSuggestions.length > 0 && (
+                                <div className="absolute z-[100] top-full mt-2 w-[120%] left-0 bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden py-2">
+                                    {deptSuggestions.map((dept, idx) => (
+                                        <button
+                                            key={idx}
+                                            type="button"
+                                            onClick={() => {
+                                                setFilters({ ...filters, department: dept });
+                                                setShowDeptSuggestions(false);
+                                            }}
+                                            className="w-full text-left px-4 py-2.5 text-[11px] text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 transition-colors flex items-center gap-3 font-bold"
+                                        >
+                                            <Building2 className="w-3.5 h-3.5 text-slate-300" />
+                                            {dept}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Batch</label>
+                            <input 
+                                type="text" 
+                                placeholder="Year (e.g. 2022)..." 
+                                className="w-full h-11 px-4 bg-slate-50 border border-slate-200/60 rounded-xl text-xs font-bold focus:ring-2 focus:ring-indigo-500/10 outline-none"
+                                value={filters.batch}
+                                onChange={(e) => setFilters({...filters, batch: e.target.value})}
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Skills</label>
+                            <input 
+                                type="text" 
+                                placeholder="e.g. React, Node.js..." 
+                                className="w-full h-11 px-4 bg-slate-50 border border-slate-200/60 rounded-xl text-xs font-bold focus:ring-2 focus:ring-indigo-500/10 outline-none"
+                                value={filters.skills}
+                                onChange={(e) => setFilters({...filters, skills: e.target.value})}
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Job Role</label>
+                            <div className="flex items-center gap-2">
+                                <input 
+                                    type="text" 
+                                    placeholder="e.g. SDE..." 
+                                    className="flex-1 h-11 px-4 bg-slate-50 border border-slate-200/60 rounded-xl text-xs font-bold focus:ring-2 focus:ring-indigo-500/10 outline-none"
+                                    value={filters.jobRole}
+                                    onChange={(e) => setFilters({...filters, jobRole: e.target.value})}
+                                />
+                                <button 
+                                    onClick={() => setFilters({ college: '', department: '', batch: '', skills: '', jobRole: '', company: '' })}
+                                    className="h-11 px-4 text-rose-500 text-[10px] font-black uppercase tracking-widest hover:bg-rose-50 rounded-xl transition-all"
+                                >
+                                    Clear
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 {loading ? (
@@ -124,49 +303,58 @@ const CompanyAlumni = () => {
                         <p className="text-sm text-slate-400 font-medium">Try broadening your search or check back later.</p>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
                         {filteredAlumni.map((person) => (
                             <FadeContent key={person.id} blur duration={500}>
-                                <SpotlightCard className="bg-white border border-slate-200 shadow-sm rounded-[32px] p-6 hover:shadow-xl hover:shadow-indigo-500/5 transition-all group" spotlightColor="rgba(79, 70, 229, 0.04)">
-                                    <div className="flex items-start justify-between mb-6">
-                                        <div className="relative">
-                                            <Avatar src={person.profile_picture} name={person.name} size={64} className="rounded-2xl ring-4 ring-slate-50" />
-                                            <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-emerald-500 border-2 border-white rounded-full" />
-                                        </div>
+                                <SpotlightCard className="bg-white border border-slate-200/60 shadow-sm rounded-[28px] p-5 hover:shadow-xl hover:shadow-indigo-500/5 transition-all group" spotlightColor="rgba(79, 70, 229, 0.04)">
+                                    <div className="flex items-start justify-between mb-4">
+                                        <Link to={`/profile/${person.id}`} className="relative block group/avatar">
+                                            <Avatar src={person.profile_picture} name={person.name} size={52} className="rounded-xl ring-2 ring-slate-100 group-hover/avatar:ring-indigo-200 transition-all" />
+                                            <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 border-2 border-white rounded-full" />
+                                        </Link>
                                         <Link 
                                             to={`/profile/${person.id}`}
-                                            className="p-2.5 bg-slate-50 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
+                                            className="p-2 bg-slate-50 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
                                         >
-                                            < ChevronRight className="w-5 h-5" />
+                                            <ChevronRight className="w-4 h-4" />
                                         </Link>
                                     </div>
 
-                                    <div className="space-y-1 mb-6">
-                                        <h3 className="text-lg font-black text-slate-900 flex items-center gap-1.5 leading-tight">
+                                    <div className="space-y-0.5 mb-5">
+                                        <h3 className="text-sm font-black text-slate-900 truncate leading-tight flex items-center gap-1">
                                             {person.name}
-                                            <CheckCircle2 className="w-4 h-4 text-indigo-500" />
+                                            <CheckCircle2 className="w-3 h-3 text-indigo-500 flex-shrink-0" />
                                         </h3>
-                                        <div className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase tracking-tight">
-                                            <Briefcase className="w-3.5 h-3.5" /> {person.job_role || 'Professional'}
-                                        </div>
+                                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tight truncate flex items-center gap-1.5">
+                                            <Briefcase className="w-3 h-3 text-slate-400" /> {person.job_role || 'Professional'}
+                                        </p>
+                                        <p className="text-[9px] font-semibold text-slate-500 truncate flex items-center gap-1.5 mt-0.5">
+                                            <Building2 className="w-3 h-3 text-indigo-400" /> {person.department || 'General Branch'}
+                                        </p>
+                                        <p className="text-[9px] font-semibold text-slate-400 truncate flex items-center gap-1.5 mt-0.5">
+                                            <School className="w-3 h-3 text-slate-300" /> {person.college || 'Platform Alumni'}
+                                        </p>
                                     </div>
 
-                                    <div className="flex items-center gap-3 pt-6 border-t border-slate-100">
+                                    <div className="flex items-center gap-2 pt-4 border-t border-slate-100/60">
                                         <button 
                                             onClick={() => handleFollow(person.id)}
                                             disabled={followStatus[person.id] === 'pending' || followStatus[person.id] === 'accepted'}
-                                            className={`flex-1 h-12 rounded-2xl text-xs font-black transition-all flex items-center justify-center gap-2 ${
+                                            className={`flex-1 h-10 rounded-xl text-[10px] font-black transition-all flex items-center justify-center gap-1.5 ${
                                                 followStatus[person.id] === 'accepted' ? 'bg-emerald-50 text-emerald-600' :
                                                 followStatus[person.id] === 'pending' ? 'bg-amber-50 text-amber-600' :
-                                                'bg-slate-900 text-white hover:bg-slate-800 shadow-lg shadow-slate-200'
+                                                'bg-slate-900 text-white hover:bg-slate-800'
                                             }`}
                                         >
-                                            {followStatus[person.id] === 'accepted' ? <><UserCheck className="w-4 h-4" /> Connected</> :
-                                             followStatus[person.id] === 'pending' ? <><RefreshCw className="w-4 h-4 animate-spin" /> Pending</> :
-                                             <><UserPlus className="w-4 h-4" /> Connect</>}
+                                            {followStatus[person.id] === 'accepted' ? <><UserCheck className="w-3.5 h-3.5" /> Connected</> :
+                                             followStatus[person.id] === 'pending' ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Pending</> :
+                                             <><UserPlus className="w-3.5 h-3.5" /> Connect</>}
                                         </button>
-                                        <button onClick={() => navigate('/chat')} className="w-12 h-12 bg-white border border-slate-200 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-2xl flex items-center justify-center transition-all">
-                                            <MessageSquare className="w-4 h-4" />
+                                        <button 
+                                            onClick={() => handleMessageClick(person.id)}
+                                            className="w-10 h-10 bg-white border border-slate-200 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl flex items-center justify-center transition-all"
+                                        >
+                                            <MessageSquare className="w-3.5 h-3.5" />
                                         </button>
                                     </div>
                                 </SpotlightCard>

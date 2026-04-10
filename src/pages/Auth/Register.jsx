@@ -444,7 +444,7 @@ const Register = () => {
                                             <div className="relative group">
                                                 <input 
                                                     name="department" 
-                                                    placeholder="College Dept" 
+                                                    placeholder="Branch / Department" 
                                                     value={formData.department}
                                                     onChange={handleChange} 
                                                     onFocus={() => setShowDeptSuggestions(true)}

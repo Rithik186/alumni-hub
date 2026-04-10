@@ -480,7 +480,12 @@ export const tamilNaduColleges = [
 ];
 
 export const engineeringDepartments = [
+  "Agricultural Engineering",
   "Artificial Intelligence and Data Science",
+  "Artificial Intelligence and Machine Learning",
+  "Biomedical Engineering",
+  "Biotechnology",
+  "Computer Science (Cyber Security)",
   "Aeronautical Engineering",
   "Agriculture Engineering",
   "Agricultural and Irrigation Engineering (SS)",

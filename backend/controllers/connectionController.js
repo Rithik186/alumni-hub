@@ -131,7 +131,8 @@ export const getFollowRequests = async (req, res) => {
     const userId = req.user.id;
     try {
         const requests = await db.query(`
-            SELECT f.*, u.name as follower_name, u.college as follower_college, u.role as follower_role
+            SELECT f.*, u.name as follower_name, u.college as follower_college, u.role as follower_role,
+                   u.profile_picture as follower_avatar
             FROM follows f
             JOIN users u ON f.follower_id = u.id
             WHERE f.following_id = $1 AND f.status = 'pending'

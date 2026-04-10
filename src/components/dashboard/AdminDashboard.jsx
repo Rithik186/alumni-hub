@@ -25,7 +25,10 @@ const AdminDashboard = () => {
     const [editingUser, setEditingUser] = useState(null);
     
     // Form States
-    const [userForm, setUserForm] = useState({ name: '', email: '', password: '', role: 'student', college: '', department: '' });
+    const [userForm, setUserForm] = useState({ 
+        name: '', email: '', password: '', role: 'student', 
+        college: '', department: '', company: '', job_role: '', batch: '' 
+    });
     const [eventForm, setEventForm] = useState({ title: '', description: '', date: '', type: 'general', metadata: {} });
 
     const [showCollegeSuggestions, setShowCollegeSuggestions] = useState(false);
@@ -125,6 +128,7 @@ const AdminDashboard = () => {
         },
         onSuccess: () => {
             queryClient.invalidateQueries(['adminDashboardData']);
+            queryClient.invalidateQueries(['events']);
             setIsEventModalOpen(false);
             setEventForm({ title: '', description: '', date: '', type: 'general', metadata: {} });
 
@@ -138,6 +142,7 @@ const AdminDashboard = () => {
         },
         onSuccess: () => {
             queryClient.invalidateQueries(['adminDashboardData']);
+            queryClient.invalidateQueries(['events']);
             toast.success('Event deleted');
         }
     });
@@ -546,50 +551,65 @@ const AdminDashboard = () => {
                                         </div>
                                     </div>
 
-                                    <div className="space-y-2 relative">
-                                        <label className="text-xs font-bold text-slate-700 ml-1">Department</label>
-                                        <input 
-                                            type="text" 
-                                            placeholder="e.g. Computer Science" 
-                                            className="w-full h-13 bg-slate-50 border border-slate-200 rounded-2xl px-5 text-sm font-medium focus:ring-4 focus:ring-indigo-50 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400" 
-                                            required 
-                                            value={userForm.department} 
-                                            onFocus={() => setShowDeptSuggestions(true)}
-                                            onBlur={() => setTimeout(() => setShowDeptSuggestions(false), 200)}
-                                            onChange={(e) => setUserForm({ ...userForm, department: e.target.value })} 
-                                        />
-                                        <AnimatePresence>
-                                            {showDeptSuggestions && deptSuggestions.length > 0 && (
-                                                <motion.div 
-                                                    initial={{ opacity: 0, scale: 0.95, y: -10 }}
-                                                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                                                    exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                                                    className="absolute z-[300] top-full mt-1.5 w-full bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden"
-                                                >
-                                                    <div className="p-2 px-5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-                                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Suggested Departments</span>
-                                                        <Sparkles className="w-2.5 h-2.5 text-indigo-400" />
-                                                    </div>
-                                                    <div className="max-h-[250px] overflow-y-auto custom-scrollbar">
-                                                        {deptSuggestions.map((dept, idx) => (
-                                                            <button
-                                                                key={idx}
-                                                                type="button"
-                                                                onClick={() => {
-                                                                    setUserForm({ ...userForm, department: dept });
-                                                                    setShowDeptSuggestions(false);
-                                                                }}
-                                                                className="w-full text-left px-5 py-3.5 text-[13px] text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-colors border-b border-slate-50 last:border-0 flex items-center gap-3"
-                                                            >
-                                                                <BookOpen className="w-4 h-4 text-slate-300" />
-                                                                <span className="truncate flex-1">{dept}</span>
-                                                            </button>
-                                                        ))}
-                                                    </div>
-                                                </motion.div>
-                                            )}
-                                        </AnimatePresence>
+                                    <div className="grid grid-cols-3 gap-6">
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-slate-700 ml-1">Branch / Department</label>
+                                            <div className="relative group/dept">
+                                                <input 
+                                                    type="text" 
+                                                    placeholder="e.g. Computer Science (Cyber Security)" 
+                                                    className="w-full h-11 bg-slate-50 border border-slate-200 rounded-xl px-4 text-xs font-medium focus:ring-4 focus:ring-indigo-50 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400" 
+                                                    required 
+                                                    value={userForm.department} 
+                                                    onFocus={() => setShowDeptSuggestions(true)}
+                                                    onBlur={() => setTimeout(() => setShowDeptSuggestions(false), 200)}
+                                                    onChange={(e) => setUserForm({ ...userForm, department: e.target.value })} 
+                                                />
+                                                <AnimatePresence>
+                                                    {showDeptSuggestions && deptSuggestions.length > 0 && (
+                                                        <motion.div 
+                                                            initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                                                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                                                            exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                                                            className="absolute z-[300] top-full mt-1.5 w-[150%] left-0 bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden"
+                                                        >
+                                                            <div className="max-h-[250px] overflow-y-auto custom-scrollbar">
+                                                                {deptSuggestions.map((dept, idx) => (
+                                                                    <button
+                                                                        key={idx}
+                                                                        type="button"
+                                                                        onClick={() => {
+                                                                            setUserForm({ ...userForm, department: dept });
+                                                                            setShowDeptSuggestions(false);
+                                                                        }}
+                                                                        className="w-full text-left px-5 py-3 text-[11px] text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-colors border-b border-slate-50 last:border-0 flex items-center gap-3"
+                                                                    >
+                                                                        <BookOpen className="w-4 h-4 text-slate-300" />
+                                                                        <span className="truncate flex-1">{dept}</span>
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                        </motion.div>
+                                                    )}
+                                                </AnimatePresence>
+                                            </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-slate-700 ml-1">Batch (Year)</label>
+                                            <input type="text" placeholder="e.g. 2024" className="w-full h-11 bg-slate-50 border border-slate-200 rounded-xl px-4 text-xs font-medium focus:ring-4 focus:ring-indigo-50 focus:border-indigo-500 outline-none transition-all" value={userForm.batch} onChange={(e) => setUserForm({ ...userForm, batch: e.target.value })} />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-slate-700 ml-1">Current Company</label>
+                                            <input type="text" placeholder="e.g. Zoho" className="w-full h-11 bg-slate-50 border border-slate-200 rounded-xl px-4 text-xs font-medium focus:ring-4 focus:ring-indigo-50 focus:border-indigo-500 outline-none transition-all" value={userForm.company} onChange={(e) => setUserForm({ ...userForm, company: e.target.value })} />
+                                        </div>
                                     </div>
+
+                                    {userForm.role === 'alumni' && (
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-slate-700 ml-1">Job Role / Designation</label>
+                                            <input type="text" placeholder="e.g. Senior Software Engineer" className="w-full h-11 bg-slate-50 border border-slate-200 rounded-xl px-4 text-xs font-medium focus:ring-4 focus:ring-indigo-50 focus:border-indigo-500 outline-none transition-all" value={userForm.job_role} onChange={(e) => setUserForm({ ...userForm, job_role: e.target.value })} />
+                                        </div>
+                                    )}
 
                                     {editingUser && (
                                         <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 flex gap-6">
@@ -652,6 +672,7 @@ const AdminDashboard = () => {
                                                 <select className="w-full h-13 bg-slate-50 border border-slate-200 rounded-2xl px-5 pr-10 text-sm font-medium focus:ring-4 focus:ring-indigo-50 focus:border-indigo-500 outline-none transition-all appearance-none" value={eventForm.type} onChange={(e) => setEventForm({ ...eventForm, type: e.target.value, metadata: {} })}>
                                                     <option value="general">General Broadcast</option>
                                                     <option value="training">Technical Training</option>
+                                                    <option value="placement">Placement Drive</option>
                                                     <option value="job">Job Opening</option>
                                                     <option value="internship">Internship Opportunity</option>
                                                     <option value="alumni_meet">Alumni Meetup</option>
@@ -752,6 +773,9 @@ const AdminDashboard = () => {
             role: userItem.role,
             college: userItem.college || '',
             department: userItem.department || '',
+            company: userItem.company || '',
+            job_role: userItem.job_role || '',
+            batch: userItem.batch || '',
             is_active: userItem.is_active,
             is_approved: userItem.is_approved
         });

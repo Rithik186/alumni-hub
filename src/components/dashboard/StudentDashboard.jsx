@@ -290,7 +290,7 @@ const StudentDashboard = () => {
     const { data: eventsList = [] } = useQuery({
         queryKey: ['events'],
         queryFn: async () => (await axios.get('/api/events', authHeader(user.token))).data,
-        staleTime: 5 * 60 * 1000,
+        staleTime: 10 * 1000,
     });
 
 
@@ -771,7 +771,7 @@ const StudentDashboard = () => {
                                         <button onClick={() => setEventFilters({...eventFilters, status: 'upcoming'})} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${eventFilters.status === 'upcoming' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}>Upcoming</button>
                                         <button onClick={() => setEventFilters({...eventFilters, status: 'completed'})} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${eventFilters.status === 'completed' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}>Completed</button>
                                         <div className="h-8 w-[1px] bg-slate-200 mx-1" />
-                                        {['all', 'job', 'internship', 'training', 'alumni_meet'].map(cat => (
+                                        {['all', 'placement', 'job', 'internship', 'training', 'alumni_meet'].map(cat => (
                                             <button key={cat} onClick={() => setEventFilters({...eventFilters, category: cat})} className={`px-4 py-2 rounded-xl text-xs font-bold capitalize transition-all ${eventFilters.category === cat ? 'bg-slate-900 text-white' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}>
                                                 {cat.replace('_', ' ')}
                                             </button>
@@ -820,7 +820,11 @@ const StudentDashboard = () => {
                                     {eventsList.filter(e => {
                                         const now = new Date();
                                         const eventDate = new Date(e.date);
-                                        const matchesStatus = eventFilters.status === 'upcoming' ? eventDate >= now : eventDate < now;
+                                        // Allow a 6-hour grace period for events to stay in 'upcoming'
+                                        const gracePeriod = 6 * 60 * 60 * 1000;
+                                        const matchesStatus = eventFilters.status === 'upcoming' 
+                                            ? (eventDate.getTime() + gracePeriod) >= now.getTime() 
+                                            : (eventDate.getTime() + gracePeriod) < now.getTime();
                                         const matchesCategory = eventFilters.category === 'all' || e.type === eventFilters.category;
                                         const matchesCompany = !eventFilters.company || e.metadata?.company?.toLowerCase().includes(eventFilters.company.toLowerCase());
                                         const matchesRole = !eventFilters.role || e.metadata?.role?.toLowerCase().includes(eventFilters.role.toLowerCase());
@@ -843,7 +847,10 @@ const StudentDashboard = () => {
                                         eventsList.filter(e => {
                                             const now = new Date();
                                             const eventDate = new Date(e.date);
-                                            const matchesStatus = eventFilters.status === 'upcoming' ? eventDate >= now : eventDate < now;
+                                            const gracePeriod = 6 * 60 * 60 * 1000;
+                                            const matchesStatus = eventFilters.status === 'upcoming' 
+                                                ? (eventDate.getTime() + gracePeriod) >= now.getTime() 
+                                                : (eventDate.getTime() + gracePeriod) < now.getTime();
                                             const matchesCategory = eventFilters.category === 'all' || e.type === eventFilters.category;
                                             const matchesCompany = !eventFilters.company || e.metadata?.company?.toLowerCase().includes(eventFilters.company.toLowerCase());
                                             const matchesRole = !eventFilters.role || e.metadata?.role?.toLowerCase().includes(eventFilters.role.toLowerCase());

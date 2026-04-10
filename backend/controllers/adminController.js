@@ -60,8 +60,13 @@ export const getPlatformStats = async (req, res) => {
 export const getAllUsers = async (req, res) => {
     try {
         const result = await db.query(
-            `SELECT u.id, u.name, u.email, u.role, u.college, u.is_active, u.is_approved, u.created_at
+            `SELECT u.id, u.name, u.email, u.role, u.college, u.is_active, u.is_approved, u.created_at,
+                    COALESCE(ap.department, sp.department) as department,
+                    ap.company, ap.job_role,
+                    COALESCE(ap.batch, sp.batch) as batch
              FROM users u
+             LEFT JOIN alumni_profiles ap ON u.id = ap.user_id
+             LEFT JOIN student_profiles sp ON u.id = sp.user_id
              WHERE u.role != 'admin'
              ORDER BY u.created_at DESC`
         );
@@ -104,15 +109,34 @@ export const deleteUser = async (req, res) => {
 // Update user by admin
 export const updateUserByAdmin = async (req, res) => {
     const { userId } = req.params;
-    const { name, email, role, is_active, is_approved, college } = req.body;
+    const { name, email, role, is_active, is_approved, college, department, company, job_role, batch } = req.body;
 
     try {
+        await db.query('BEGIN');
+        
         await db.query(
             'UPDATE users SET name = $1, email = $2, role = $3, is_active = $4, is_approved = $5, college = $6 WHERE id = $7',
             [name, email, role, is_active, is_approved, college, userId]
         );
+
+        if (role === 'alumni') {
+            await db.query(
+                `UPDATE alumni_profiles 
+                 SET department = $1, company = $2, job_role = $3, batch = $4 
+                 WHERE user_id = $5`,
+                [department, company, job_role, batch, userId]
+            );
+        } else if (role === 'student') {
+            await db.query(
+                'UPDATE student_profiles SET department = $1, batch = $2 WHERE user_id = $3',
+                [department, batch, userId]
+            );
+        }
+
+        await db.query('COMMIT');
         res.json({ message: 'User updated successfully' });
     } catch (error) {
+        await db.query('ROLLBACK');
         console.error('Update User Admin Error:', error);
         res.status(500).json({ message: 'Server error updating user' });
     }
@@ -140,10 +164,11 @@ export const createUserByAdmin = async (req, res) => {
         const userId = newUser.rows[0].id;
 
         // Initialize empty profiles
+        const { department } = req.body;
         if (role === 'student') {
-            await db.query('INSERT INTO student_profiles (user_id) VALUES ($1)', [userId]);
+            await db.query('INSERT INTO student_profiles (user_id, department) VALUES ($1, $2)', [userId, department || '']);
         } else if (role === 'alumni') {
-            await db.query('INSERT INTO alumni_profiles (user_id) VALUES ($1)', [userId]);
+            await db.query('INSERT INTO alumni_profiles (user_id, department) VALUES ($1, $2)', [userId, department || '']);
         }
 
         res.status(201).json({ message: 'User created successfully', id: userId });

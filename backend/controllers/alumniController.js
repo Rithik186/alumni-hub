@@ -64,7 +64,7 @@ export const getAlumniByCompany = async (req, res) => {
     const { companyName } = req.params;
     try {
         const result = await db.query(
-            `SELECT u.id, u.name, u.profile_picture, u.role, ap.job_role, ap.company, ap.department
+            `SELECT u.id, u.name, u.profile_picture, u.role, u.college, ap.job_role, ap.company, ap.department, ap.batch, ap.skills
              FROM users u
              JOIN alumni_profiles ap ON u.id = ap.user_id
              WHERE ap.company ILIKE $1 AND u.role = 'alumni'
