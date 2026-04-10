@@ -3,7 +3,8 @@ import React, { useRef, useState } from 'react';
 const SpotlightCard = ({
     children,
     className = '',
-    spotlightColor = 'rgba(14, 165, 233, 0.15)'
+    spotlightColor = 'rgba(14, 165, 233, 0.15)',
+    overflowHidden = true
 }) => {
     const divRef = useRef(null);
     const [isFocused, setIsFocused] = useState(false);
@@ -24,7 +25,7 @@ const SpotlightCard = ({
             onBlur={() => { setIsFocused(false); setOpacity(0); }}
             onMouseEnter={() => setOpacity(0.6)}
             onMouseLeave={() => setOpacity(0)}
-            className={`relative rounded-2xl overflow-hidden ${className}`}
+            className={`relative rounded-2xl ${overflowHidden ? 'overflow-hidden' : ''} ${className}`}
         >
             <div
                 className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-500 ease-in-out"

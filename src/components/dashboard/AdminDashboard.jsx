@@ -5,14 +5,15 @@ import {
     Users, Clock, CheckCircle, XCircle,
     Search, Plus, Calendar, Trash2, X,
     Megaphone, UserCheck, Shield,
-    GraduationCap, Briefcase, Filter,
+    GraduationCap, Briefcase, Filter, BookOpen,
     Activity, Edit2, UserPlus, Mail,
     Building2, MoreVertical, Check, AlertCircle,
-    LayoutDashboard, UserCircle, Settings, LogOut
+    LayoutDashboard, UserCircle, Settings, LogOut, Sparkles
 } from 'lucide-react';
 import { useUser } from '../../context/UserContext';
 import axios from 'axios';
 import { toast } from 'react-hot-toast';
+import { tamilNaduColleges, engineeringDepartments, collegeSpecificDepartments } from '../../data/colleges';
 
 const AdminDashboard = () => {
     const { user } = useUser();
@@ -24,8 +25,27 @@ const AdminDashboard = () => {
     const [editingUser, setEditingUser] = useState(null);
     
     // Form States
-    const [userForm, setUserForm] = useState({ name: '', email: '', password: '', role: 'student', college: '' });
+    const [userForm, setUserForm] = useState({ name: '', email: '', password: '', role: 'student', college: '', department: '' });
     const [eventForm, setEventForm] = useState({ title: '', description: '', date: '', type: 'general', metadata: {} });
+
+    const [showCollegeSuggestions, setShowCollegeSuggestions] = useState(false);
+    const collegeSuggestions = useMemo(() => {
+        if (!userForm.college) return [];
+        return tamilNaduColleges.filter(c => 
+            c.toLowerCase().includes(userForm.college.toLowerCase())
+        ).slice(0, 8);
+    }, [userForm.college]);
+
+    const [showDeptSuggestions, setShowDeptSuggestions] = useState(false);
+    const deptSuggestions = useMemo(() => {
+        if (!userForm.department) return [];
+        const collegeName = (userForm.college || '').trim().toLowerCase();
+        const specificListKey = Object.keys(collegeSpecificDepartments).find(k => k.toLowerCase() === collegeName);
+        const baseList = specificListKey ? collegeSpecificDepartments[specificListKey] : engineeringDepartments;
+        return baseList.filter(d => 
+            d.toLowerCase().includes(userForm.department.toLowerCase())
+        ).slice(0, 8);
+    }, [userForm.department, userForm.college]);
 
 
     // Fetch All Admin Data
@@ -93,7 +113,7 @@ const AdminDashboard = () => {
             queryClient.invalidateQueries(['adminDashboardData']);
             setIsUserModalOpen(false);
             setEditingUser(null);
-            setUserForm({ name: '', email: '', password: '', role: 'student', college: '' });
+            setUserForm({ name: '', email: '', password: '', role: 'student', college: '', department: '' });
             toast.success(editingUser ? 'Profile updated successfully' : 'New user created successfully');
         },
         onError: (err) => toast.error(err.response?.data?.message || 'Error saving user')
@@ -222,7 +242,7 @@ const AdminDashboard = () => {
 
                     <div className="flex items-center gap-3">
                         <button 
-                            onClick={() => { setEditingUser(null); setUserForm({ name: '', email: '', password: '', role: 'student', college: '' }); setIsUserModalOpen(true); }}
+                            onClick={() => { setEditingUser(null); setUserForm({ name: '', email: '', password: '', role: 'student', college: '', department: '' }); setIsUserModalOpen(true); }}
                             className="bg-slate-900 text-white px-6 py-3 rounded-xl flex items-center gap-2 hover:bg-slate-800 transition-all font-bold text-sm shadow-lg shadow-slate-200"
                         >
                             <Plus className="w-4 h-4" /> Add User
@@ -446,9 +466,9 @@ const AdminDashboard = () => {
                             initial={{ opacity: 0, scale: 0.95, y: 20 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                            className="bg-white w-full max-w-2xl rounded-[32px] shadow-2xl relative z-10 overflow-hidden"
+                            className="bg-white w-full max-w-2xl rounded-[32px] shadow-2xl relative z-10"
                         >
-                            <div className="p-10">
+                            <div className="p-10 overflow-visible">
                                 <div className="flex items-center justify-between mb-10">
                                     <h3 className="text-2xl font-bold text-slate-900 tracking-tight">{editingUser ? 'Edit User Profile' : 'Create New User Accountant'}</h3>
                                     <button onClick={() => setIsUserModalOpen(false)} className="w-10 h-10 bg-slate-50 text-slate-400 rounded-full flex items-center justify-center hover:bg-red-50 hover:text-red-500 transition-all"><X className="w-5 h-5" /></button>
@@ -482,10 +502,93 @@ const AdminDashboard = () => {
                                                 <option value="admin">Administrator</option>
                                             </select>
                                         </div>
-                                        <div className="space-y-2">
+                                        <div className="space-y-2 relative">
                                             <label className="text-xs font-bold text-slate-700 ml-1">College / Institution</label>
-                                            <input type="text" className="w-full h-13 bg-slate-50 border border-slate-200 rounded-2xl px-5 text-sm font-medium focus:ring-4 focus:ring-indigo-50 focus:border-indigo-500 outline-none transition-all" value={userForm.college} onChange={(e) => setUserForm({ ...userForm, college: e.target.value })} />
+                                            <input 
+                                                type="text" 
+                                                className="w-full h-13 bg-slate-50 border border-slate-200 rounded-2xl px-5 text-sm font-medium focus:ring-4 focus:ring-indigo-50 focus:border-indigo-500 outline-none transition-all" 
+                                                value={userForm.college} 
+                                                onFocus={() => setShowCollegeSuggestions(true)}
+                                                onBlur={() => setTimeout(() => setShowCollegeSuggestions(false), 200)}
+                                                onChange={(e) => setUserForm({ ...userForm, college: e.target.value })} 
+                                            />
+                                            <AnimatePresence>
+                                                {showCollegeSuggestions && collegeSuggestions.length > 0 && (
+                                                    <motion.div 
+                                                        initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                                                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                                                        exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                                                        className="absolute z-[300] top-full mt-1.5 w-full bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden"
+                                                    >
+                                                        <div className="p-2 px-5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Suggested Colleges</span>
+                                                            <Sparkles className="w-2.5 h-2.5 text-indigo-400" />
+                                                        </div>
+                                                        <div className="max-h-[250px] overflow-y-auto custom-scrollbar">
+                                                            {collegeSuggestions.map((college, idx) => (
+                                                                <button
+                                                                    key={idx}
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        setUserForm({ ...userForm, college });
+                                                                        setShowCollegeSuggestions(false);
+                                                                    }}
+                                                                    className="w-full text-left px-5 py-3.5 text-[13px] text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-colors border-b border-slate-50 last:border-0 flex items-center gap-3"
+                                                                >
+                                                                    <GraduationCap className="w-4 h-4 text-slate-300" />
+                                                                    <span className="truncate flex-1">{college}</span>
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    </motion.div>
+                                                )}
+                                            </AnimatePresence>
                                         </div>
+                                    </div>
+
+                                    <div className="space-y-2 relative">
+                                        <label className="text-xs font-bold text-slate-700 ml-1">Department</label>
+                                        <input 
+                                            type="text" 
+                                            placeholder="e.g. Computer Science" 
+                                            className="w-full h-13 bg-slate-50 border border-slate-200 rounded-2xl px-5 text-sm font-medium focus:ring-4 focus:ring-indigo-50 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400" 
+                                            required 
+                                            value={userForm.department} 
+                                            onFocus={() => setShowDeptSuggestions(true)}
+                                            onBlur={() => setTimeout(() => setShowDeptSuggestions(false), 200)}
+                                            onChange={(e) => setUserForm({ ...userForm, department: e.target.value })} 
+                                        />
+                                        <AnimatePresence>
+                                            {showDeptSuggestions && deptSuggestions.length > 0 && (
+                                                <motion.div 
+                                                    initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                                                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                                                    exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                                                    className="absolute z-[300] top-full mt-1.5 w-full bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden"
+                                                >
+                                                    <div className="p-2 px-5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Suggested Departments</span>
+                                                        <Sparkles className="w-2.5 h-2.5 text-indigo-400" />
+                                                    </div>
+                                                    <div className="max-h-[250px] overflow-y-auto custom-scrollbar">
+                                                        {deptSuggestions.map((dept, idx) => (
+                                                            <button
+                                                                key={idx}
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setUserForm({ ...userForm, department: dept });
+                                                                    setShowDeptSuggestions(false);
+                                                                }}
+                                                                className="w-full text-left px-5 py-3.5 text-[13px] text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-colors border-b border-slate-50 last:border-0 flex items-center gap-3"
+                                                            >
+                                                                <BookOpen className="w-4 h-4 text-slate-300" />
+                                                                <span className="truncate flex-1">{dept}</span>
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
                                     </div>
 
                                     {editingUser && (
@@ -518,7 +621,7 @@ const AdminDashboard = () => {
                             initial={{ opacity: 0, scale: 0.95, y: 20 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                            className="bg-white w-full max-w-2xl rounded-[32px] shadow-2xl relative z-10 overflow-hidden"
+                            className="bg-white w-full max-w-2xl rounded-[32px] shadow-2xl relative z-10"
                         >
                             <div className="p-10 max-h-[90vh] overflow-y-auto custom-scrollbar">
                                 <div className="flex items-center justify-between mb-8">
@@ -648,6 +751,7 @@ const AdminDashboard = () => {
             email: userItem.email,
             role: userItem.role,
             college: userItem.college || '',
+            department: userItem.department || '',
             is_active: userItem.is_active,
             is_approved: userItem.is_approved
         });

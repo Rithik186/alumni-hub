@@ -5,10 +5,11 @@ import {
     User, Mail, Phone, Lock, School,
     Briefcase, GraduationCap, ArrowRight,
     CheckCircle2, Smartphone, ShieldCheck,
-    Building, BookOpen, Fingerprint, Eye, EyeOff
+    Building, BookOpen, Fingerprint, Eye, EyeOff, Sparkles
 } from 'lucide-react';
 import { register, verifyOtp as verifyOtpService } from '../../services/authService';
 import { useUser } from '../../context/UserContext';
+import { tamilNaduColleges, engineeringDepartments, collegeSpecificDepartments } from '../../data/colleges';
 
 const Register = () => {
     const navigate = useNavigate();
@@ -26,6 +27,25 @@ const Register = () => {
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [strength, setStrength] = useState({ score: 0, label: 'Weak', color: 'bg-slate-200' });
+    const [showCollegeSuggestions, setShowCollegeSuggestions] = useState(false);
+    const [showDeptSuggestions, setShowDeptSuggestions] = useState(false);
+
+    const collegeSuggestions = React.useMemo(() => {
+        if (!formData.college) return [];
+        return tamilNaduColleges.filter(c => 
+            c.toLowerCase().includes(formData.college.toLowerCase())
+        ).slice(0, 8);
+    }, [formData.college]);
+
+    const deptSuggestions = React.useMemo(() => {
+        if (!formData.department) return [];
+        const collegeName = (formData.college || '').trim().toLowerCase();
+        const specificListKey = Object.keys(collegeSpecificDepartments).find(k => k.toLowerCase() === collegeName);
+        const baseList = specificListKey ? collegeSpecificDepartments[specificListKey] : engineeringDepartments;
+        return baseList.filter(d => 
+            d.toLowerCase().includes(formData.department.toLowerCase())
+        ).slice(0, 8);
+    }, [formData.department, formData.college]);
 
     const checkStrength = (pass) => {
         let score = 0;
@@ -283,10 +303,92 @@ const Register = () => {
 
                                     {role === 'student' ? (
                                         <div className="grid grid-cols-2 gap-4">
-                                            <div className="col-span-2">
-                                                <input name="college" placeholder="College Name" onChange={handleChange} required className={inputClasses} />
+                                            <div className="col-span-2 relative">
+                                                <input 
+                                                    name="college" 
+                                                    placeholder="College Name" 
+                                                    value={formData.college}
+                                                    onChange={handleChange} 
+                                                    onFocus={() => setShowCollegeSuggestions(true)}
+                                                    onBlur={() => setTimeout(() => setShowCollegeSuggestions(false), 200)}
+                                                    required 
+                                                    className={inputClasses} 
+                                                />
+                                                <AnimatePresence>
+                                                    {showCollegeSuggestions && collegeSuggestions.length > 0 && (
+                                                        <motion.div 
+                                                            initial={{ opacity: 0, y: -10 }}
+                                                            animate={{ opacity: 1, y: 0 }}
+                                                            exit={{ opacity: 0, y: -10 }}
+                                                            className="absolute z-[300] top-full mt-1.5 w-[150%] sm:w-[180%] left-0 bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden"
+                                                        >
+                                                            <div className="p-2 px-5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                                                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Suggested Institutions</span>
+                                                                <Sparkles className="w-2.5 h-2.5 text-indigo-400" />
+                                                            </div>
+                                                            <div className="max-h-[250px] overflow-y-auto custom-scrollbar">
+                                                                {collegeSuggestions.map((college, idx) => (
+                                                                    <button
+                                                                        key={idx}
+                                                                        type="button"
+                                                                        onClick={() => {
+                                                                            setFormData({ ...formData, college });
+                                                                            setShowCollegeSuggestions(false);
+                                                                        }}
+                                                                        className="w-full text-left px-5 py-3 text-[12px] text-slate-600 hover:bg-slate-50 hover:text-primary-600 transition-colors border-b border-slate-50 last:border-0 flex items-center gap-3 font-medium"
+                                                                    >
+                                                                        <GraduationCap className="w-4 h-4 text-slate-300" />
+                                                                        <span className="truncate flex-1">{college}</span>
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                        </motion.div>
+                                                    )}
+                                                </AnimatePresence>
                                             </div>
-                                            <input name="department" placeholder="Department" onChange={handleChange} required className={inputClasses} />
+                                            <div className="relative group">
+                                                <input 
+                                                    name="department" 
+                                                    placeholder="Department" 
+                                                    value={formData.department}
+                                                    onChange={handleChange} 
+                                                    onFocus={() => setShowDeptSuggestions(true)}
+                                                    onBlur={() => setTimeout(() => setShowDeptSuggestions(false), 200)}
+                                                    required 
+                                                    className={inputClasses} 
+                                                />
+                                                <AnimatePresence>
+                                                    {showDeptSuggestions && deptSuggestions.length > 0 && (
+                                                        <motion.div 
+                                                            initial={{ opacity: 0, y: -10 }}
+                                                            animate={{ opacity: 1, y: 0 }}
+                                                            exit={{ opacity: 0, y: -10 }}
+                                                            className="absolute z-[300] top-full mt-1.5 w-[150%] sm:w-[180%] left-0 bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden"
+                                                        >
+                                                            <div className="p-2 px-5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                                                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Suggested Departments</span>
+                                                                <Sparkles className="w-2.5 h-2.5 text-indigo-400" />
+                                                            </div>
+                                                            <div className="max-h-[250px] overflow-y-auto custom-scrollbar">
+                                                                {deptSuggestions.map((dept, idx) => (
+                                                                    <button
+                                                                        key={idx}
+                                                                        type="button"
+                                                                        onClick={() => {
+                                                                            setFormData({ ...formData, department: dept });
+                                                                            setShowDeptSuggestions(false);
+                                                                        }}
+                                                                        className="w-full text-left px-5 py-3 text-[12px] text-slate-600 hover:bg-slate-50 hover:text-primary-600 transition-colors border-b border-slate-50 last:border-0 flex items-center gap-3 font-medium"
+                                                                    >
+                                                                        <BookOpen className="w-4 h-4 text-slate-300" />
+                                                                        <span className="truncate flex-1">{dept}</span>
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                        </motion.div>
+                                                    )}
+                                                </AnimatePresence>
+                                            </div>
                                             <input name="batch" placeholder="Batch Year" onChange={handleChange} required className={inputClasses} />
                                             <div className="col-span-2">
                                                 <input name="register_number" placeholder="Register Number" onChange={handleChange} required className={inputClasses} />
@@ -294,12 +396,94 @@ const Register = () => {
                                         </div>
                                     ) : (
                                         <div className="grid grid-cols-2 gap-4">
-                                            <div className="col-span-2">
-                                                <input name="college" placeholder="College Name" onChange={handleChange} required className={inputClasses} />
+                                            <div className="col-span-2 relative">
+                                                <input 
+                                                    name="college" 
+                                                    placeholder="College Name" 
+                                                    value={formData.college}
+                                                    onChange={handleChange} 
+                                                    onFocus={() => setShowCollegeSuggestions(true)}
+                                                    onBlur={() => setTimeout(() => setShowCollegeSuggestions(false), 200)}
+                                                    required 
+                                                    className={inputClasses} 
+                                                />
+                                                <AnimatePresence>
+                                                    {showCollegeSuggestions && collegeSuggestions.length > 0 && (
+                                                        <motion.div 
+                                                            initial={{ opacity: 0, y: -10 }}
+                                                            animate={{ opacity: 1, y: 0 }}
+                                                            exit={{ opacity: 0, y: -10 }}
+                                                            className="absolute z-[300] top-full mt-1.5 w-[150%] sm:w-[180%] left-0 bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden"
+                                                        >
+                                                            <div className="p-2 px-5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                                                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Suggested Institutions</span>
+                                                                <Sparkles className="w-2.5 h-2.5 text-indigo-400" />
+                                                            </div>
+                                                            <div className="max-h-[250px] overflow-y-auto custom-scrollbar">
+                                                                {collegeSuggestions.map((college, idx) => (
+                                                                    <button
+                                                                        key={idx}
+                                                                        type="button"
+                                                                        onClick={() => {
+                                                                            setFormData({ ...formData, college });
+                                                                            setShowCollegeSuggestions(false);
+                                                                        }}
+                                                                        className="w-full text-left px-5 py-3 text-[12px] text-slate-600 hover:bg-slate-50 hover:text-primary-600 transition-colors border-b border-slate-50 last:border-0 flex items-center gap-3 font-medium"
+                                                                    >
+                                                                        <GraduationCap className="w-4 h-4 text-slate-300" />
+                                                                        <span className="truncate flex-1">{college}</span>
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                        </motion.div>
+                                                    )}
+                                                </AnimatePresence>
                                             </div>
                                             <input name="company" placeholder="Current Company" onChange={handleChange} required className={inputClasses} />
                                             <input name="job_role" placeholder="Designation" onChange={handleChange} required className={inputClasses} />
-                                            <input name="department" placeholder="College Dept" onChange={handleChange} required className={inputClasses} />
+                                            <div className="relative group">
+                                                <input 
+                                                    name="department" 
+                                                    placeholder="College Dept" 
+                                                    value={formData.department}
+                                                    onChange={handleChange} 
+                                                    onFocus={() => setShowDeptSuggestions(true)}
+                                                    onBlur={() => setTimeout(() => setShowDeptSuggestions(false), 200)}
+                                                    required 
+                                                    className={inputClasses} 
+                                                />
+                                                <AnimatePresence>
+                                                    {showDeptSuggestions && deptSuggestions.length > 0 && (
+                                                        <motion.div 
+                                                            initial={{ opacity: 0, y: -10 }}
+                                                            animate={{ opacity: 1, y: 0 }}
+                                                            exit={{ opacity: 0, y: -10 }}
+                                                            className="absolute z-[300] top-full mt-1.5 w-[150%] sm:w-[180%] left-0 bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden"
+                                                        >
+                                                            <div className="p-2 px-5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                                                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Suggested Departments</span>
+                                                                <Sparkles className="w-2.5 h-2.5 text-indigo-400" />
+                                                            </div>
+                                                            <div className="max-h-[250px] overflow-y-auto custom-scrollbar">
+                                                                {deptSuggestions.map((dept, idx) => (
+                                                                    <button
+                                                                        key={idx}
+                                                                        type="button"
+                                                                        onClick={() => {
+                                                                            setFormData({ ...formData, department: dept });
+                                                                            setShowDeptSuggestions(false);
+                                                                        }}
+                                                                        className="w-full text-left px-5 py-3 text-[12px] text-slate-600 hover:bg-slate-50 hover:text-primary-600 transition-colors border-b border-slate-50 last:border-0 flex items-center gap-3 font-medium"
+                                                                    >
+                                                                        <BookOpen className="w-4 h-4 text-slate-300" />
+                                                                        <span className="truncate flex-1">{dept}</span>
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                        </motion.div>
+                                                    )}
+                                                </AnimatePresence>
+                                            </div>
                                             <input name="batch" placeholder="Alumni Batch" onChange={handleChange} required className={inputClasses} />
                                         </div>
                                     )}

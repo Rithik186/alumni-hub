@@ -17,6 +17,7 @@ import axios from 'axios';
 import PostItem from '../shared/PostItem';
 import SpotlightCard from '../animations/SpotlightCard';
 import Avatar from './Avatar';
+import { tamilNaduColleges, engineeringDepartments, collegeSpecificDepartments } from '../../data/colleges';
 
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -219,7 +220,7 @@ const StudentDashboard = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [filterDomain, setFilterDomain] = useState('All');
     const [showFilters, setShowFilters] = useState(false);
-    const [searchFilters, setSearchFilters] = useState({ company: '', college: '', batch: '', skills: '', job_role: '' });
+    const [searchFilters, setSearchFilters] = useState({ company: '', college: '', branch: '', batch: '', skills: '', job_role: '' });
     const [selectedEvent, setSelectedEvent] = useState(null);
     const [eventFilters, setEventFilters] = useState({ 
         status: 'upcoming', 
@@ -230,6 +231,25 @@ const StudentDashboard = () => {
         maxLpa: '', 
         location: '' 
     });
+
+    const [showCollegeSuggestions, setShowCollegeSuggestions] = useState(false);
+    const collegeSuggestions = useMemo(() => {
+        if (!searchFilters.college) return [];
+        return tamilNaduColleges.filter(c => 
+            c.toLowerCase().includes(searchFilters.college.toLowerCase())
+        ).slice(0, 8);
+    }, [searchFilters.college]);
+
+    const [showBranchSuggestions, setShowBranchSuggestions] = useState(false);
+    const branchSuggestions = useMemo(() => {
+        if (!searchFilters.branch) return [];
+        const collegeName = (searchFilters.college || '').trim().toLowerCase();
+        const specificListKey = Object.keys(collegeSpecificDepartments).find(k => k.toLowerCase() === collegeName);
+        const baseList = specificListKey ? collegeSpecificDepartments[specificListKey] : engineeringDepartments;
+        return baseList.filter(d => 
+            d.toLowerCase().includes(searchFilters.branch.toLowerCase())
+        ).slice(0, 8);
+    }, [searchFilters.branch, searchFilters.college]);
 
     const commonRoles = [
         'Software Engineer', 'Frontend Developer', 'Backend Developer', 'Full Stack Developer',
@@ -497,8 +517,8 @@ const StudentDashboard = () => {
                     {/* ═══════════════════════════════════════════════════════ */}
                     <main className="flex-1 min-w-0 space-y-3">
                         {/* Search Bar */}
-                        <SpotlightCard className="bg-transparent" spotlightColor="rgba(79, 70, 229, 0.08)">
-                        <div className="sd-card overflow-hidden">
+                        <SpotlightCard className="bg-transparent" spotlightColor="rgba(79, 70, 229, 0.08)" overflowHidden={false}>
+                        <div className="sd-card">
                             <div className="p-3 flex gap-2">
                                 <div className="relative flex-1">
                                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -526,18 +546,112 @@ const StudentDashboard = () => {
                             {showFilters && (
                                 <div className="px-3 pb-3 pt-0 border-t border-slate-100">
                                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2.5">
-                                        {Object.entries(searchFilters).map(([key, val]) => (
-                                            <input
-                                                key={key}
-                                                type="text"
-                                                placeholder={key.replace('_', ' ')}
-                                                value={val}
-                                                onChange={e => { setSearchFilters(f => ({ ...f, [key]: e.target.value })); setView('search'); }}
-                                                className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 placeholder:text-slate-400 capitalize outline-none focus:border-indigo-300 focus:ring-1 focus:ring-indigo-500/10 transition-all"
-                                            />
-                                        ))}
-                                        <button onClick={() => setSearchFilters({ company: '', college: '', batch: '', skills: '', job_role: '' })} className="text-xs font-medium text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg px-3 py-1.5 transition-all">
-                                            Clear
+                                        {Object.entries(searchFilters).map(([key, val]) => {
+                                            if (key === 'college') {
+                                                return (
+                                                    <div key={key} className="relative group">
+                                                        <input
+                                                            type="text"
+                                                            placeholder="College Name"
+                                                            value={val}
+                                                            onFocus={() => setShowCollegeSuggestions(true)}
+                                                            onBlur={() => setTimeout(() => setShowCollegeSuggestions(false), 200)}
+                                                            onChange={e => { setSearchFilters(f => ({ ...f, college: e.target.value })); setView('search'); setShowCollegeSuggestions(true); }}
+                                                            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 placeholder:text-slate-400 capitalize outline-none focus:border-indigo-300 focus:ring-1 focus:ring-indigo-500/10 transition-all"
+                                                        />
+                                                        <AnimatePresence>
+                                                            {showCollegeSuggestions && collegeSuggestions.length > 0 && (
+                                                                <motion.div 
+                                                                    initial={{ opacity: 0, y: -10 }}
+                                                                    animate={{ opacity: 1, y: 0 }}
+                                                                    exit={{ opacity: 0, y: -10 }}
+                                                                    className="absolute z-[300] top-full mt-1.5 w-[140%] sm:w-[180%] left-0 bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden"
+                                                                >
+                                                                    <div className="p-1 px-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                                                                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Suggested Institutions</span>
+                                                                        <Sparkles className="w-2.5 h-2.5 text-indigo-400" />
+                                                                    </div>
+                                                                    <div className="max-h-[300px] overflow-y-auto custom-scrollbar">
+                                                                        {collegeSuggestions.map((college, idx) => (
+                                                                            <button
+                                                                                key={idx}
+                                                                                onClick={() => {
+                                                                                    setSearchFilters(f => ({ ...f, college }));
+                                                                                    setShowCollegeSuggestions(false);
+                                                                                    setView('search');
+                                                                                }}
+                                                                                className="w-full text-left px-3 py-2.5 text-[11px] text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 transition-all border-b border-slate-50 last:border-0 flex items-center gap-2 group/item"
+                                                                            >
+                                                                                <GraduationCap className="w-3.5 h-3.5 text-slate-300 group-hover/item:text-indigo-400" />
+                                                                                <span className="flex-1 truncate">{college}</span>
+                                                                            </button>
+                                                                        ))}
+                                                                    </div>
+                                                                </motion.div>
+                                                            )}
+                                                        </AnimatePresence>
+                                                    </div>
+                                                );
+                                            }
+                                            if (key === 'branch') {
+                                                return (
+                                                    <div key={key} className="relative group">
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Branch / Dept"
+                                                            value={val}
+                                                            onFocus={() => setShowBranchSuggestions(true)}
+                                                            onBlur={() => setTimeout(() => setShowBranchSuggestions(false), 200)}
+                                                            onChange={e => { setSearchFilters(f => ({ ...f, branch: e.target.value })); setView('search'); setShowBranchSuggestions(true); }}
+                                                            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 placeholder:text-slate-400 capitalize outline-none focus:border-indigo-300 focus:ring-1 focus:ring-indigo-500/10 transition-all"
+                                                        />
+                                                        <AnimatePresence>
+                                                            {showBranchSuggestions && branchSuggestions.length > 0 && (
+                                                                <motion.div 
+                                                                    initial={{ opacity: 0, y: -10 }}
+                                                                    animate={{ opacity: 1, y: 0 }}
+                                                                    exit={{ opacity: 0, y: -10 }}
+                                                                    className="absolute z-[300] top-full mt-1.5 w-[140%] sm:w-[180%] left-0 bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden"
+                                                                >
+                                                                    <div className="p-1 px-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                                                                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Suggested Branches</span>
+                                                                        <Sparkles className="w-2.5 h-2.5 text-indigo-400" />
+                                                                    </div>
+                                                                    <div className="max-h-[300px] overflow-y-auto custom-scrollbar">
+                                                                        {branchSuggestions.map((branch, idx) => (
+                                                                            <button
+                                                                                key={idx}
+                                                                                onClick={() => {
+                                                                                    setSearchFilters(f => ({ ...f, branch }));
+                                                                                    setShowBranchSuggestions(false);
+                                                                                    setView('search');
+                                                                                }}
+                                                                                className="w-full text-left px-3 py-2.5 text-[11px] text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 transition-all border-b border-slate-50 last:border-0 flex items-center gap-2 group/item"
+                                                                            >
+                                                                                <BookOpen className="w-3.5 h-3.5 text-slate-300 group-hover/item:text-indigo-400" />
+                                                                                <span className="flex-1 truncate">{branch}</span>
+                                                                            </button>
+                                                                        ))}
+                                                                    </div>
+                                                                </motion.div>
+                                                            )}
+                                                        </AnimatePresence>
+                                                    </div>
+                                                );
+                                            }
+                                            return (
+                                                <input
+                                                    key={key}
+                                                    type="text"
+                                                    placeholder={key.replace('_', ' ')}
+                                                    value={val}
+                                                    onChange={e => { setSearchFilters(f => ({ ...f, [key]: e.target.value })); setView('search'); }}
+                                                    className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 placeholder:text-slate-400 capitalize outline-none focus:border-indigo-300 focus:ring-1 focus:ring-indigo-500/10 transition-all"
+                                                />
+                                            );
+                                        })}
+                                        <button onClick={() => setSearchFilters({ company: '', college: '', branch: '', batch: '', skills: '', job_role: '' })} className="text-xs font-medium text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg px-3 py-1.5 transition-all text-center">
+                                            Clear Filters
                                         </button>
                                     </div>
                                 </div>
