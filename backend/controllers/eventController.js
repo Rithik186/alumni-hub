@@ -10,7 +10,7 @@ export const getEvents = async (req, res) => {
                      WHERE ap.company ILIKE (e.metadata->>'company')
                     ) as alumni_count
              FROM events e 
-             ORDER BY date DESC`
+             ORDER BY e.date DESC`
         );
 
         res.json(result.rows);
@@ -28,8 +28,8 @@ export const createEvent = async (req, res) => {
 
     try {
         const result = await db.query(
-            'INSERT INTO events (title, description, date, type, metadata, created_by) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-            [title, description, date, type, typeof metadata === 'string' ? metadata : JSON.stringify(metadata), created_by]
+            'INSERT INTO events ("title", "description", "date", "type", "metadata", "created_by") VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+            [title, description, date, type, typeof metadata === 'object' ? JSON.stringify(metadata) : metadata, created_by]
         );
         res.status(201).json(result.rows[0]);
     } catch (error) {
