@@ -78,12 +78,7 @@ const Chat = () => {
         }
     });
 
-    // Auto select first contact if none selected
-    useEffect(() => {
-        if (!contactsLoading && contacts.length > 0 && !selectedContact) {
-            setSelectedContact(contacts[0]);
-        }
-    }, [contacts, contactsLoading, selectedContact]);
+    // Remove auto-selection to allow WhatsApp-like mobile behavior where contact list is shown first
 
     // Handle clicking outside emoji picker
     useEffect(() => {

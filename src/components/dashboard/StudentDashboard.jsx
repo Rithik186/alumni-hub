@@ -232,6 +232,10 @@ const StudentDashboard = () => {
         location: '' 
     });
 
+    const [isResumeModalOpen, setIsResumeModalOpen] = useState(false);
+    const [resumeAnalysis, setResumeAnalysis] = useState(null);
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
+
     const [showCollegeSuggestions, setShowCollegeSuggestions] = useState(false);
     const collegeSuggestions = useMemo(() => {
         if (!searchFilters.college) return [];
@@ -1156,7 +1160,10 @@ const StudentDashboard = () => {
                                             ))}
                                         </div>
 
-                                        <button className="w-full py-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl text-[11px] font-bold transition-all flex items-center justify-center gap-2 group">
+                                        <button 
+                                            onClick={() => setIsResumeModalOpen(true)}
+                                            className="w-full py-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl text-[11px] font-bold transition-all flex items-center justify-center gap-2 group"
+                                        >
                                             Analyze Resume <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
                                         </button>
                                     </div>
@@ -1446,6 +1453,249 @@ const StudentDashboard = () => {
 
             <div className="h-14 lg:hidden" />
 
+            {/* ─── RESUME ANALYZER MODAL ─────────────────────────────────── */}
+            <AnimatePresence>
+                {isResumeModalOpen && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => !isAnalyzing && setIsResumeModalOpen(false)}
+                            className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+                        />
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                            className="relative w-full max-w-2xl bg-white rounded-[32px] shadow-2xl overflow-hidden"
+                        >
+                            {!resumeAnalysis ? (
+                                <div className="p-8">
+                                    <div className="flex items-center justify-between mb-8">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-12 h-12 rounded-2xl bg-indigo-600 flex items-center justify-center">
+                                                <Sparkles className="w-6 h-6 text-white" />
+                                            </div>
+                                            <div>
+                                                <h2 className="text-xl font-bold text-slate-900">Resume Intelligence</h2>
+                                                <p className="text-sm text-slate-500 font-medium">AI-powered ATS & Skill Gap Analysis</p>
+                                            </div>
+                                        </div>
+                                        <button 
+                                            onClick={() => setIsResumeModalOpen(false)}
+                                            className="p-2 hover:bg-slate-100 rounded-full transition-all"
+                                        >
+                                            <X className="w-5 h-5 text-slate-400" />
+                                        </button>
+                                    </div>
+
+                                    {isAnalyzing ? (
+                                        <div className="py-20 flex flex-col items-center justify-center">
+                                            <div className="relative w-24 h-24 mb-6">
+                                                <div className="absolute inset-0 rounded-full border-4 border-slate-100" />
+                                                <motion.div 
+                                                    className="absolute inset-0 rounded-full border-4 border-indigo-600 border-t-transparent"
+                                                    animate={{ rotate: 360 }}
+                                                    transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
+                                                />
+                                                <div className="absolute inset-0 flex items-center justify-center">
+                                                    <Sparkles className="w-8 h-8 text-indigo-600 animate-pulse" />
+                                                </div>
+                                            </div>
+                                            <h3 className="text-lg font-bold text-slate-900 mb-2">Analyzing your Resume...</h3>
+                                            <p className="text-sm text-slate-500 font-medium animate-pulse">Running ATS checks & identifying skill gaps</p>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-6">
+                                            <div className="border-2 border-dashed border-slate-200 rounded-[24px] p-10 flex flex-col items-center group hover:border-indigo-300 hover:bg-indigo-50/30 transition-all">
+                                                <div className="w-16 h-16 rounded-2xl bg-slate-50 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                                                    <Briefcase className="w-8 h-8 text-slate-400 group-hover:text-indigo-600" />
+                                                </div>
+                                                <h4 className="text-base font-bold text-slate-900 mb-1">Upload your Resume</h4>
+                                                <p className="text-sm text-slate-500 font-medium mb-6 text-center">PDF or DOCX format. Professional & clean layouts perform better.</p>
+                                                <label className="px-6 py-3 bg-indigo-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all cursor-pointer">
+                                                    Select File
+                                                    <input 
+                                                        type="file" 
+                                                        hidden 
+                                                        accept=".pdf,.doc,.docx" 
+                                                        onChange={async (e) => {
+                                                            const file = e.target.files[0];
+                                                            if (!file) return;
+                                                            
+                                                            // Clear previous details if any
+                                                            setResumeAnalysis(null);
+                                                            setIsAnalyzing(true);
+                                                            
+                                                            const formData = new FormData();
+                                                            formData.append('resume', file);
+                                                            try {
+                                                                const { data } = await axios.post('/api/resume/analyze', formData, authHeader(user.token));
+                                                                setResumeAnalysis(data);
+                                                            } catch (err) {
+                                                                console.error(err);
+                                                                // Handle error (optional: toast)
+                                                                setIsAnalyzing(false);
+                                                            } finally {
+                                                                setIsAnalyzing(false);
+                                                            }
+                                                        }}
+                                                    />
+                                                </label>
+                                            </div>
+
+                                            <div className="grid grid-cols-3 gap-4">
+                                                {[
+                                                    { icon: CheckCircle2, label: '98% Accuracy', desc: 'ATS Prediction' },
+                                                    { icon: Zap, label: 'Skill Gaps', desc: 'Market Matching' },
+                                                    { icon: TrendingUp, label: 'Optimized', desc: 'Job Referral' }
+                                                ].map((item, idx) => (
+                                                    <div key={idx} className="p-4 rounded-2xl bg-slate-50 border border-slate-100">
+                                                        <item.icon className="w-5 h-5 text-indigo-500 mb-2" />
+                                                        <p className="text-[11px] font-bold text-slate-900">{item.label}</p>
+                                                        <p className="text-[10px] text-slate-500 font-medium">{item.desc}</p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="max-h-[85vh] overflow-y-auto">
+                                    <div className="sticky top-0 bg-white/80 backdrop-blur-md px-8 py-5 border-b border-slate-100 flex items-center justify-between z-10">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center">
+                                                <Sparkles className="w-5 h-5 text-white" />
+                                            </div>
+                                            <h2 className="text-lg font-bold text-slate-900">Analysis Report</h2>
+                                        </div>
+                                        <button 
+                                            onClick={() => setResumeAnalysis(null)}
+                                            className="text-xs font-bold text-indigo-600 hover:text-indigo-700 bg-indigo-50 px-3 py-1.5 rounded-lg"
+                                        >
+                                            Re-analyze Resume
+                                        </button>
+                                    </div>
+
+                                    <div className="p-8 space-y-8">
+                                        {/* Score Section */}
+                                        <div className="flex items-center gap-8 bg-indigo-600 rounded-[28px] p-8 text-white relative overflow-hidden">
+                                            <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-32 -mt-32 blur-3xl" />
+                                            <div className="relative flex flex-col items-center">
+                                                <div className="w-28 h-28 rounded-full border-[10px] border-white/20 flex items-center justify-center mb-2">
+                                                    <span className="text-4xl font-black">{resumeAnalysis.ats_score}</span>
+                                                </div>
+                                                <p className="text-[10px] font-black uppercase tracking-widest text-indigo-200">ATS SCORE</p>
+                                            </div>
+                                            <div className="relative flex-1">
+                                                <h3 className="text-xl font-bold mb-2">Great start, {user.name?.split(' ')[0]}!</h3>
+                                                <p className="text-sm text-indigo-100 font-medium leading-relaxed">
+                                                    {resumeAnalysis.summary}
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-6">
+                                            {/* Skills Matched */}
+                                            <div className="space-y-4">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                                    <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Identified Skills</h4>
+                                                </div>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {resumeAnalysis.skills_found?.map((s, i) => (
+                                                        <span key={i} className="px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg text-xs font-bold border border-emerald-100">
+                                                            {s}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            {/* Skills Missing */}
+                                            <div className="space-y-4">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                                                    <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Growth areas</h4>
+                                                </div>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {resumeAnalysis.missing_skills?.map((s, i) => (
+                                                        <span key={i} className="px-3 py-1.5 bg-rose-50 text-rose-700 rounded-lg text-xs font-bold border border-rose-100">
+                                                            {s}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Soft Skills Section */}
+                                        {resumeAnalysis.soft_skills?.length > 0 && (
+                                            <div className="space-y-4">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                                                    <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Soft Skill Presence</h4>
+                                                </div>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {resumeAnalysis.soft_skills.map((s, i) => (
+                                                        <span key={i} className="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-[11px] font-bold border border-blue-100">
+                                                            {s}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Recommendations */}
+                                        <div className="bg-amber-50 rounded-2xl p-6 border border-amber-100">
+                                            <h4 className="text-xs font-bold text-amber-900 uppercase tracking-wider mb-4 flex items-center gap-2">
+                                                <Zap className="w-4 h-4" /> AI Recommendations
+                                            </h4>
+                                            <div className="space-y-3">
+                                                {resumeAnalysis.recommendations?.map((r, i) => (
+                                                    <div key={i} className="flex items-start gap-3">
+                                                        <div className="mt-1.5 w-1 h-1 rounded-full bg-amber-400 shrink-0" />
+                                                        <p className="text-xs text-amber-800 font-semibold leading-relaxed">{r}</p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {/* Company Matches */}
+                                        <div className="space-y-4">
+                                            <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                                                <Building2 className="w-4 h-4" /> Company Compatibility
+                                            </h4>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                {resumeAnalysis.top_company_matches?.map((c, i) => (
+                                                    <div key={i} className="p-4 rounded-2xl border border-slate-100 bg-slate-50 flex items-center justify-between group hover:bg-white hover:shadow-xl hover:shadow-indigo-50 transition-all cursor-pointer">
+                                                        <div>
+                                                            <p className="text-sm font-bold text-slate-900">{c.name}</p>
+                                                            <p className="text-[10px] text-slate-500 font-medium">{c.alumni_count} Alumni Hired</p>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <p className="text-xs font-black text-indigo-600">{c.match}%</p>
+                                                            <p className="text-[9px] font-bold text-slate-400 tracking-tighter uppercase">MATCH</p>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="p-8 pt-0">
+                                        <button 
+                                            onClick={() => setIsResumeModalOpen(false)}
+                                            className="w-full py-4 bg-slate-900 text-white rounded-2xl text-xs font-bold shadow-xl hover:bg-slate-800 transition-all active:scale-95"
+                                        >
+                                            Dismiss Analysis
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
         </div>
     );
 };
