@@ -32,7 +32,12 @@ export const getContacts = async (req, res) => {
 
 export const getMessages = async (req, res) => {
     const userId = req.user.id;
-    const { contactId } = req.params;
+    const contactId = parseInt(req.params.contactId);
+    
+    if (isNaN(contactId)) {
+        return res.status(400).json({ message: 'Invalid contact ID' });
+    }
+
     try {
         const query = `
             SELECT id, sender_id as "senderId", receiver_id as "receiverId", content as text, created_at as timestamp, image_url, video_url
@@ -50,13 +55,21 @@ export const getMessages = async (req, res) => {
 export const sendMessage = async (req, res) => {
     const senderId = req.user.id;
     const { receiverId, text, image_url, video_url } = req.body;
+    const targetId = parseInt(receiverId);
+
+    if (isNaN(targetId)) {
+        return res.status(400).json({ message: 'Invalid receiver ID' });
+    }
+
     try {
         const query = `
             INSERT INTO messages (sender_id, receiver_id, content, image_url, video_url)
             VALUES ($1, $2, $3, $4, $5)
             RETURNING id, sender_id as "senderId", receiver_id as "receiverId", content as text, created_at as timestamp, image_url, video_url
         `;
-        const result = await db.query(query, [senderId, receiverId, text, image_url || null, video_url || null]);
+        // Ensure content is not null (DB requirement)
+        const content = text || (image_url || video_url ? '' : ' ');
+        const result = await db.query(query, [senderId, targetId, content, image_url || null, video_url || null]);
         res.json(result.rows[0]);
     } catch (err) {
         res.status(500).json({ message: err.message });

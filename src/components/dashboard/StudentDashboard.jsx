@@ -321,7 +321,10 @@ const StudentDashboard = () => {
     // ── Network Queries (loaded when network view is active) ──────────────
     const { data: followRequests = [], isLoading: loadingRequests } = useQuery({
         queryKey: ['followRequests'],
-        queryFn: async () => (await axios.get('/api/connections/requests', authHeader(user.token))).data,
+        queryFn: async () => {
+            const { data } = await axios.get('/api/connections/requests', authHeader(user.token));
+            return Array.isArray(data) ? data.filter(req => (req.follower_id || req.id) !== user.id) : [];
+        },
         enabled: view === 'network',
     });
 
@@ -343,7 +346,8 @@ const StudentDashboard = () => {
         queryFn: async () => {
             const params = new URLSearchParams({ name: searchQuery, ...searchFilters });
             const { data } = await axios.get(`/api/student/alumni?${params}`, authHeader(user.token));
-            return Array.isArray(data) ? data : [];
+            if (!Array.isArray(data)) return [];
+            return data.filter(p => p?.id !== user?.id);
         },
         enabled: searchEnabled, staleTime: 30000, retry: 1,
     });
@@ -370,6 +374,8 @@ const StudentDashboard = () => {
         }
     });
 
+    if (!user) return null;
+
     // ── Derived Data ─────────────────────────────────────────────────────────
     const filteredFeed = useMemo(() => {
         if (filterDomain === 'All') return feed;
@@ -386,8 +392,6 @@ const StudentDashboard = () => {
         });
         return Object.entries(words).sort((a, b) => b[1] - a[1]).slice(0, 5);
     }, [feed]);
-
-    if (!user) return null;
 
     // ═════════════════════════════════════════════════════════════════════════
     return (

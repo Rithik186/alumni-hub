@@ -4,7 +4,8 @@ const SpotlightCard = ({
     children,
     className = '',
     spotlightColor = 'rgba(14, 165, 233, 0.15)',
-    overflowHidden = true
+    overflowHidden = true,
+    ...props
 }) => {
     const divRef = useRef(null);
     const [isFocused, setIsFocused] = useState(false);
@@ -26,6 +27,7 @@ const SpotlightCard = ({
             onMouseEnter={() => setOpacity(0.6)}
             onMouseLeave={() => setOpacity(0)}
             className={`relative rounded-2xl ${overflowHidden ? 'overflow-hidden' : ''} ${className}`}
+            {...props}
         >
             <div
                 className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-500 ease-in-out"

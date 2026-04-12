@@ -35,6 +35,7 @@ const Chat = () => {
     const [attachment, setAttachment] = useState({ image_url: '', video_url: '' });
     const [selectedContact, setSelectedContact] = useState(null);
     const [search, setSearch] = useState("");
+    const [isUploading, setIsUploading] = useState(false);
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const [viewImage, setViewImage] = useState(null);
     const [editingMessage, setEditingMessage] = useState(null);
@@ -108,7 +109,7 @@ const Chat = () => {
             return data;
         },
         enabled: !!selectedContact,
-        refetchInterval: 3000 // Real-time polling substitute
+        refetchInterval: 10000 // Increased interval to reduce jumpiness
     });
 
     // Scroll to bottom on new messages
@@ -122,11 +123,39 @@ const Chat = () => {
         mutationFn: async (msgData) => axios.post('/api/chat/messages', msgData, {
             headers: { 'Authorization': `Bearer ${user.token}` }
         }),
-        onSuccess: () => {
-            queryClient.invalidateQueries(['chatMessages', selectedContact?.id]);
-            setNewMessage('');
-            setAttachment({ image_url: '', video_url: '' });
-            setShowEmojiPicker(false);
+        onMutate: async (newMsg) => {
+            await queryClient.cancelQueries(['chatMessages', selectedContact?.id]);
+            const previousMessages = queryClient.getQueryData(['chatMessages', selectedContact?.id]);
+            
+            // Create optimistic message
+            const optimisticMsg = {
+                id: Date.now(), // temporary id
+                senderId: user.id,
+                receiverId: selectedContact.id,
+                text: newMsg.text,
+                image_url: newMsg.image_url,
+                video_url: newMsg.video_url,
+                timestamp: new Date().toISOString(),
+                is_optimistic: true // mark for UI
+            };
+
+            queryClient.setQueryData(['chatMessages', selectedContact?.id], old => [...(old || []), optimisticMsg]);
+            return { previousMessages };
+        },
+        onError: (err, newMsg, context) => {
+            queryClient.setQueryData(['chatMessages', selectedContact?.id], context.previousMessages);
+        },
+        onSuccess: (data) => {
+            // Merge the actual message from server into the cache
+            queryClient.setQueryData(['chatMessages', selectedContact?.id], (old) => {
+                if (!Array.isArray(old)) return [data.data];
+                // Remove the optimistic version and add the real one
+                return old.filter(m => !m.is_optimistic).concat(data.data);
+            });
+        },
+        onSettled: () => {
+            // Optional: background refetch just to be sure
+            queryClient.invalidateQueries({ queryKey: ['chatMessages', selectedContact?.id], refetchType: 'none' });
         }
     });
 
@@ -153,22 +182,43 @@ const Chat = () => {
     const handleMediaUpload = async (e, type) => {
         const file = e.target.files[0];
         if (!file) return;
-        const formData = new FormData();
-        formData.append('file', file);
+
+        // Instant local preview
+        const localUrl = URL.createObjectURL(file);
+        if (type === 'image') setAttachment(prev => ({ ...prev, image_url: localUrl, video_url: '', file }));
+        else setAttachment(prev => ({ ...prev, video_url: localUrl, image_url: '', file }));
+
+        // Start upload in background
+        setIsUploading(true);
         try {
+            const formData = new FormData();
+            formData.append('file', file);
             const { data } = await axios.post('/api/upload/media', formData, {
                 headers: { 'Authorization': `Bearer ${user.token}` }
             });
-            if (type === 'image') setAttachment(prev => ({ ...prev, image_url: data.url, video_url: '' }));
-            else setAttachment(prev => ({ ...prev, video_url: data.url, image_url: '' }));
+            
+            // Update the attachment state with the real server URL, but keep the file reference
+            setAttachment(prev => {
+                const updated = { ...prev };
+                if (type === 'image') updated.image_url = data.url;
+                else updated.video_url = data.url;
+                return updated;
+            });
         } catch (err) {
             console.error('Upload Error:', err);
+            // Optionally notify user
+        } finally {
+            setIsUploading(false);
         }
     };
 
-    const handleSend = () => {
+    const handleSend = async () => {
         if ((!newMessage.trim() && !attachment.image_url && !attachment.video_url) || !selectedContact) return;
         
+        // If still uploading, we should wait or keep polling (simple way: just block until done)
+        // For a more complex 'fast' feel, we'd queue it, but let's just make the button reflect the state.
+        if (isUploading) return;
+
         const msgText = newMessage;
         const msgAttachment = { ...attachment };
 
@@ -401,6 +451,11 @@ const Chat = () => {
                                                                 ? 'bg-indigo-600 text-white rounded-br-sm shadow-indigo-100 hover:bg-indigo-700' 
                                                                 : 'bg-white border border-slate-200 text-slate-800 rounded-bl-sm hover:border-slate-300'
                                                             }`}>
+                                                                {msg.is_optimistic && (
+                                                                    <div className="absolute inset-0 bg-white/20 backdrop-blur-[1px] flex items-center justify-center rounded-2xl">
+                                                                        <Loader2 className="w-4 h-4 animate-spin text-white/80" />
+                                                                    </div>
+                                                                )}
                                                                 {msg.image_url && (
                                                                     <div className="relative group/img mb-2 cursor-pointer overflow-hidden rounded-xl" onClick={() => setViewImage(msg.image_url)}>
                                                                         <img src={msg.image_url} alt="Shared" className="w-full max-w-full md:max-w-[300px] object-cover transition-transform group-hover/img:scale-105" />
@@ -450,126 +505,125 @@ const Chat = () => {
                         </div>
 
                         {/* Input Hub */}
-                        <div className="px-4 md:px-8 py-4 md:py-6 bg-white border-t border-slate-100 w-full relative z-30">
-                            
-                             {/* Attachment Preview Overlay (WhatsApp Style) */}
+                        <div className="px-4 md:px-8 py-4 bg-white border-t border-slate-100 w-full relative z-30">
+                            {/* Attachment Preview Overlay */}
                             <AnimatePresence>
                                 {(attachment.image_url || attachment.video_url) && (
                                     <motion.div 
                                         initial={{ opacity: 0, y: 10, scale: 0.95 }}
                                         animate={{ opacity: 1, y: 0, scale: 1 }}
                                         exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                                        className="absolute bottom-[100%] left-4 right-4 md:left-8 md:right-8 mb-4 md:mb-6 bg-white p-4 md:p-6 border border-slate-200 rounded-[24px] md:rounded-[32px] shadow-2xl z-[50] flex flex-col gap-4 md:gap-6"
+                                        className="absolute bottom-[100%] left-4 right-4 md:left-8 md:right-8 mb-4 bg-white p-3 border border-slate-200 rounded-2xl shadow-2xl z-[50]"
                                     >
-                                        <div className="flex items-center justify-between">
-                                            <h4 className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-slate-400">Media Preview</h4>
-                                            <Button variant="ghost" size="icon" className="h-8 w-8 md:h-10 md:w-10 bg-slate-50 hover:bg-red-50 hover:text-red-500 rounded-full transition-all" onClick={() => setAttachment({ image_url: '', video_url: '' })}>
-                                                <X className="w-4 h-4 md:w-5 md:h-5" />
+                                        <div className="flex items-center justify-between mb-3 px-1">
+                                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Media Preview</span>
+                                            <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-rose-50 hover:text-rose-500 rounded-full" onClick={() => setAttachment({ image_url: '', video_url: '' })}>
+                                                <X className="w-4 h-4" />
                                             </Button>
                                         </div>
 
-                                        <div className="flex flex-col items-center">
-                                            <div className="w-full max-h-[250px] md:max-h-[300px] rounded-xl md:rounded-2xl overflow-hidden shadow-2xl flex items-center justify-center bg-slate-900">
-                                                {attachment.image_url && <img src={attachment.image_url} alt="Preview" className="max-h-[250px] md:max-h-[300px] w-auto object-contain" />}
-                                                {attachment.video_url && <video src={attachment.video_url} controls className="max-h-[250px] md:max-h-[300px] w-auto" />}
+                                        <div className="flex flex-col items-center bg-slate-50 rounded-xl overflow-hidden mb-3">
+                                            <div className="w-full max-h-[200px] flex items-center justify-center">
+                                                {attachment.image_url && <img src={attachment.image_url} alt="Preview" className="max-h-[200px] w-auto object-contain" />}
+                                                {attachment.video_url && <video src={attachment.video_url} controls className="max-h-[200px] w-auto" />}
                                             </div>
                                         </div>
 
-                                        <div className="flex items-center gap-2 md:gap-3 bg-slate-50 p-1.5 md:p-2 rounded-xl md:rounded-2xl border border-slate-200 shadow-inner group focus-within:bg-white focus-within:ring-4 focus-within:ring-indigo-100 transition-all duration-300">
-                                            <div className="p-2 md:p-3 text-slate-400">
-                                                <Edit className="w-4 h-4 md:w-5 md:h-5" />
-                                            </div>
+                                        <div className="flex items-center gap-2 bg-slate-100/50 p-2 rounded-xl border border-slate-200/50 focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
                                             <input
                                                 type="text"
                                                 value={newMessage}
                                                 onChange={(e) => setNewMessage(e.target.value)}
-                                                onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                                                onKeyDown={(e) => e.key === 'Enter' && !isUploading && handleSend()}
                                                 placeholder="Add a caption..."
-                                                className="flex-1 bg-transparent px-1 text-xs md:text-sm font-bold outline-none text-slate-800 placeholder:text-slate-400"
+                                                className="flex-1 bg-transparent px-2 text-sm font-medium outline-none text-slate-700 placeholder:text-slate-400"
                                             />
                                             <Button
                                                 onClick={handleSend}
-                                                disabled={sendMessageMutation.isPending}
-                                                className="h-10 w-10 md:h-12 md:w-12 rounded-full bg-indigo-600 text-white shadow-xl hover:bg-indigo-700 transition-all flex items-center justify-center active:scale-90"
+                                                disabled={isUploading || sendMessageMutation.isPending}
+                                                className="h-9 w-9 rounded-full bg-indigo-600 text-white shadow-lg hover:bg-indigo-700 transition-all flex items-center justify-center active:scale-90"
                                             >
-                                                <Send className="w-5 h-5 md:w-6 md:h-6 ml-0.5" />
+                                                {isUploading || sendMessageMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4 ml-0.5" />}
                                             </Button>
                                         </div>
                                     </motion.div>
                                 )}
                             </AnimatePresence>
 
-                            <div className="flex items-center gap-2 md:gap-3 bg-white p-1.5 md:p-2 rounded-xl border border-slate-200 shadow-sm group focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
-                                <div className="flex items-center gap-1 md:gap-3">
+                            <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-2xl border border-slate-200 group focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
+                                <div className="flex items-center gap-1">
                                     <TooltipProvider>
                                         <Tooltip>
                                             <TooltipTrigger asChild>
-                                                <label className="p-1.5 md:p-2 text-slate-400 hover:text-indigo-600 rounded-lg transition-all cursor-pointer">
-                                                    <ImageIcon className="w-4 h-4 md:w-5 md:h-5" />
-                                                    <input type="file" className="hidden" accept="image/*" onChange={e => handleMediaUpload(e, 'image')} />
-                                                </label>
+                                                <div className="flex items-center">
+                                                    <label className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all cursor-pointer">
+                                                        <Paperclip className="w-5 h-5" />
+                                                        <input type="file" className="hidden" accept="image/*,video/*" onChange={e => {
+                                                            const file = e.target.files[0];
+                                                            if (file?.type.startsWith('image/')) handleMediaUpload(e, 'image');
+                                                            else handleMediaUpload(e, 'video');
+                                                        }} />
+                                                    </label>
+                                                </div>
                                             </TooltipTrigger>
-                                            <TooltipContent className="bg-slate-900 text-white font-bold text-[10px] mb-2">Share Captured Visual</TooltipContent>
-                                        </Tooltip>
-                                        <Tooltip>
-                                            <TooltipTrigger asChild>
-                                                <label className="hidden sm:block p-2 text-slate-400 hover:text-indigo-600 rounded-lg transition-all cursor-pointer">
-                                                    <Paperclip className="w-5 h-5" />
-                                                    <input type="file" className="hidden" accept="video/*" onChange={e => handleMediaUpload(e, 'video')} />
-                                                </label>
-                                            </TooltipTrigger>
-                                            <TooltipContent className="bg-slate-900 text-white font-bold text-[10px] mb-2">Attached Secure Files</TooltipContent>
+                                            <TooltipContent className="bg-slate-900 text-white font-bold text-[10px] mb-2">Attach Media</TooltipContent>
                                         </Tooltip>
                                     </TooltipProvider>
-                                </div>
 
-                                <div className="relative" ref={emojiPickerRef}>
                                     <Button
                                         variant="ghost"
                                         size="icon"
                                         onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                                        className={`h-7 w-7 md:h-8 md:w-8 rounded-lg transition-all ${showEmojiPicker ? 'bg-indigo-50 text-indigo-600' : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'}`}
+                                        className={`h-9 w-9 rounded-xl transition-all ${showEmojiPicker ? 'bg-indigo-50 text-indigo-600' : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'}`}
                                     >
-                                        <Smile className="w-4 h-4 md:w-5 md:h-5" />
+                                        <Smile className="w-5 h-5" />
                                     </Button>
-                                    <AnimatePresence>
-                                        {showEmojiPicker && (
-                                            <motion.div 
-                                                initial={{ opacity: 0, scale: 0.95, y: -20 }}
-                                                animate={{ opacity: 1, scale: 1, y: -410 }}
-                                                exit={{ opacity: 0, scale: 0.95, y: -20 }}
-                                                className="absolute left-0 z-50 shadow-[0_20px_50px_rgba(79,70,229,0.3)] rounded-2xl overflow-hidden border border-slate-100 scale-75 origin-bottom-left md:scale-100"
-                                            >
-                                                <EmojiPicker 
-                                                    onEmojiClick={(emojiData) => setNewMessage(prev => prev + emojiData.emoji)}
-                                                />
-                                            </motion.div>
-                                        )}
-                                    </AnimatePresence>
                                 </div>
 
                                 <input
                                     type="text"
                                     value={newMessage}
                                     onChange={(e) => setNewMessage(e.target.value)}
-                                    onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                                    onKeyDown={(e) => e.key === 'Enter' && !isUploading && handleSend()}
                                     placeholder={editingMessage ? "Edit message..." : "Type a message..."}
-                                    className="flex-1 bg-transparent px-1 text-xs md:text-sm font-medium outline-none text-slate-800 placeholder:text-slate-400 min-w-0"
+                                    className="flex-1 bg-transparent px-1 text-sm font-medium outline-none text-slate-800 placeholder:text-slate-400 min-w-0"
                                 />
 
                                 <Button
                                     onClick={handleSend}
-                                    disabled={(!newMessage.trim() && !attachment.image_url && !attachment.video_url) || sendMessageMutation.isPending || editMessageMutation.isPending}
-                                    className={`h-9 w-9 md:h-11 md:w-11 rounded-full shadow-lg transition-all active:scale-95 flex items-center justify-center shrink-0 ${
+                                    disabled={(!newMessage.trim() && !attachment.image_url && !attachment.video_url) || sendMessageMutation.isPending || isUploading}
+                                    className={`h-10 w-10 rounded-full shadow-lg transition-all active:scale-95 flex items-center justify-center shrink-0 ${
                                         editingMessage 
                                         ? 'bg-emerald-600 hover:bg-emerald-700' 
                                         : 'bg-indigo-600 hover:bg-indigo-700'
                                     } text-white border-none`}
-                                    title={editingMessage ? 'Update' : 'Send'}
                                 >
-                                    {editingMessage ? <Check className="w-5 h-5 md:w-6 md:h-6" /> : <Send className="w-5 h-5 md:w-6 md:h-6 ml-0.5" />}
+                                    {isUploading || sendMessageMutation.isPending ? (
+                                        <Loader2 className="w-5 h-5 animate-spin" />
+                                    ) : (
+                                        editingMessage ? <Check className="w-5 h-5" /> : <Send className="w-5 h-5 ml-0.5" />
+                                    )}
                                 </Button>
                             </div>
+
+                            <AnimatePresence>
+                                {showEmojiPicker && (
+                                    <div className="absolute bottom-[100%] left-4 z-50 mb-4" ref={emojiPickerRef}>
+                                        <motion.div 
+                                            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                                            exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                                            className="shadow-2xl rounded-2xl overflow-hidden border border-slate-100"
+                                        >
+                                            <EmojiPicker 
+                                                onEmojiClick={(emojiData) => setNewMessage(prev => prev + emojiData.emoji)}
+                                                width={320}
+                                                height={400}
+                                            />
+                                        </motion.div>
+                                    </div>
+                                )}
+                            </AnimatePresence>
                             
                             {editingMessage && (
                                 <div className="mt-2 text-center">

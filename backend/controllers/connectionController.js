@@ -4,6 +4,11 @@ import db from '../config/db.js';
 export const followUser = async (req, res) => {
     const followerId = req.user.id;
     const { followingId } = req.params;
+
+    if (followerId.toString() === followingId.toString()) {
+        return res.status(400).json({ message: 'You cannot follow yourself' });
+    }
+
     try {
         // Check if already following/requested
         const existing = await db.query(
@@ -135,7 +140,7 @@ export const getFollowRequests = async (req, res) => {
                    u.profile_picture as follower_avatar
             FROM follows f
             JOIN users u ON f.follower_id = u.id
-            WHERE f.following_id = $1 AND f.status = 'pending'
+            WHERE f.following_id = $1 AND f.status = 'pending' AND f.follower_id <> f.following_id
         `, [userId]);
         res.json(requests.rows);
     } catch (err) {
