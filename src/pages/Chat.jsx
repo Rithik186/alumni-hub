@@ -111,52 +111,42 @@ const Chat = () => {
         refetchInterval: 10000 // Increased interval to reduce jumpiness
     });
 
+    const socketRef = useRef(null);
+
     // Initialize Socket
     useEffect(() => {
-        if (user && user.id) {
-            console.log("--- CALL DEBUG: Initializing Socket for User:", user.id);
+        if (user && user.id && !socketRef.current) {
+            console.warn("!!! CALL SYSTEM: STABILIZING SOCKET FOR UID:", user.id);
             const socket = initiateSocket(user.id);
+            socketRef.current = socket;
 
             const handleRegistration = () => {
-                console.log("--- CALL DEBUG: Socket Connected. Registering UID:", user.id);
+                console.warn("!!! CALL SYSTEM: CONNECTED. REGISTERING UID:", user.id);
                 socket.emit('register', user.id);
             };
 
-            if (socket.connected) {
-                handleRegistration();
-            }
-
+            if (socket.connected) handleRegistration();
             socket.on('connect', handleRegistration);
 
             socket.on('incoming-call', (data) => {
-                console.log("--- CALL DEBUG: Incoming Call Received from:", data.name, data);
-                
+                console.warn("!!! CALL SYSTEM: INCOMING CALL DATA RECEIVED!", data);
                 setActiveCall(prev => {
-                    if (prev) {
-                        console.log("--- CALL DEBUG: Already in a call, ignoring.");
-                        return prev;
-                    }
-                    return { type: 'video', contact: null, incomingData: data };
-                });
-
-                toast(`Incoming call from ${data.name}`, { 
-                    icon: '📞',
-                    duration: 10000,
-                    position: 'top-center',
-                    style: {
-                        borderRadius: '10px',
-                        background: '#333',
-                        color: '#fff',
-                    },
+                    if (prev) return prev;
+                    return { type: 'video', contact: contacts?.find(c => c.id.toString() === data.from.toString()) || null, incomingData: data };
                 });
             });
 
-            return () => {
-                console.log("--- CALL DEBUG: Disconnecting Socket");
-                disconnectSocket();
-            };
+            socket.on('call-ended', () => {
+                console.warn("!!! CALL SYSTEM: Call ended by remote peer.");
+                setActiveCall(null);
+            });
         }
-    }, [user?.id]);
+
+        return () => {
+            // Only disconnect if the user logs out or the whole chat app is closed
+            // Removing the aggressive disconnect for stability
+        };
+    }, [user?.id, contacts]);
 
     // Scroll to bottom on new messages
     useEffect(() => {
@@ -757,7 +747,18 @@ const Chat = () => {
                             user={user} 
                             selectedContact={activeCall.contact} 
                             incomingCallData={activeCall.incomingData}
-                            onEndCall={() => setActiveCall(null)} 
+                            onEndCall={(callDetails) => {
+                                setActiveCall(null);
+                                if (callDetails && callDetails.duration > 0 && selectedContact) {
+                                    const minutes = Math.floor(callDetails.duration / 60);
+                                    const seconds = callDetails.duration % 60;
+                                    const durationStr = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+                                    
+                                    sendMessageMutation.mutate({
+                                        text: `📞 Video Call ended - Duration: ${durationStr}`,
+                                    });
+                                }
+                            }} 
                         />
                     </motion.div>
                 )}

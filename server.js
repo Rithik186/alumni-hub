@@ -20,7 +20,7 @@ const io = new Server(httpServer, {
 });
 
 // Socket.io for WebRTC signaling
-const users = new Map(); // userId -> socketId
+const users = new Map(); // userId -> Set of socketIds
 
 io.on('connection', (socket) => {
   console.log('--- Socket Connected:', socket.id);
@@ -28,50 +28,66 @@ io.on('connection', (socket) => {
   socket.on('register', (userId) => {
     if (!userId) return;
     const uid = userId.toString();
-    users.set(uid, socket.id);
-    console.log(`--- User Registered: UID=${uid} | Socket=${socket.id} | Total=${users.size}`);
+    
+    if (!users.has(uid)) {
+      users.set(uid, new Set());
+    }
+    users.get(uid).add(socket.id);
+    
+    console.log(`--- User Registered: UID=${uid} | Sockets=${users.get(uid).size} | GlobalUsers=${users.size}`);
   });
 
   socket.on('call-user', ({ userToCall, signalData, from, name }) => {
     const targetUid = userToCall?.toString();
-    const targetSocket = users.get(targetUid);
     
-    console.log(`--- Call Attempt: From=${from} | To=${targetUid} | TargetSocket=${targetSocket || 'NOT FOUND'}`);
-    
-    if (targetSocket) {
-      io.to(targetSocket).emit('incoming-call', { 
-        signal: signalData, 
-        from, 
-        name 
-      });
-    } else {
-      console.log(`--- Call Failed: User ${targetUid} is not online or not registered.`);
-    }
+    const attemptCall = (retryCount = 0) => {
+      const targetSockets = users.get(targetUid);
+      console.log(`--- Call Attempt: From=${from} | To=${targetUid} | SocketsFound=${targetSockets ? targetSockets.size : 0} | Retry=${retryCount}`);
+      
+      if (targetSockets && targetSockets.size > 0) {
+        targetSockets.forEach(socketId => {
+          io.to(socketId).emit('incoming-call', { signal: signalData, from, name });
+        });
+      } else if (retryCount < 2) {
+        // Wait 1 second and try again (handles user refreshes/reconnects)
+        console.log(`--- Target offline, retrying call in 1s...`);
+        setTimeout(() => attemptCall(retryCount + 1), 1000);
+      } else {
+        console.log(`--- Call Failed: User ${targetUid} is definitely offline.`);
+      }
+    };
+
+    attemptCall();
   });
 
   socket.on('answer-call', (data) => {
     const targetUid = data.to?.toString();
-    const targetSocket = users.get(targetUid);
-    console.log(`--- Answer Call: From=${socket.id} | ToUID=${targetUid} | TargetSocket=${targetSocket}`);
-    if (targetSocket) {
-      io.to(targetSocket).emit('call-accepted', data.signal);
+    const targetSockets = users.get(targetUid);
+    if (targetSockets) {
+      targetSockets.forEach(socketId => {
+        io.to(socketId).emit('call-accepted', data.signal);
+      });
     }
   });
 
   socket.on('end-call', ({ to }) => {
     const targetUid = to?.toString();
-    const targetSocket = users.get(targetUid);
-    console.log(`--- End Call: ToUID=${targetUid}`);
-    if (targetSocket) {
-      io.to(targetSocket).emit('call-ended');
+    const targetSockets = users.get(targetUid);
+    if (targetSockets) {
+      targetSockets.forEach(socketId => {
+        io.to(socketId).emit('call-ended');
+      });
     }
   });
 
   socket.on('disconnect', () => {
-    for (const [userId, socketId] of users.entries()) {
-      if (socketId === socket.id) {
-        users.delete(userId);
-        console.log(`--- User Registered Offline: UID=${userId}`);
+    for (const [userId, socketIds] of users.entries()) {
+      if (socketIds.has(socket.id)) {
+        socketIds.delete(socket.id);
+        if (socketIds.size === 0) {
+          users.delete(userId);
+        }
+        console.log(`--- Socket Disconnected: User ${userId} | Remaining=${socketIds.size}`);
         break;
       }
     }
