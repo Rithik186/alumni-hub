@@ -11,6 +11,9 @@ import { useUser } from '../context/UserContext';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
+import MediaCall from '../components/chat/MediaCall';
+import { initiateSocket, disconnectSocket, getSocket } from '../services/socket';
+import toast from 'react-hot-toast';
 
 // UI Components
 import FadeContent from '../components/animations/FadeContent';
@@ -39,6 +42,7 @@ const Chat = () => {
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const [viewImage, setViewImage] = useState(null);
     const [editingMessage, setEditingMessage] = useState(null);
+    const [activeCall, setActiveCall] = useState(null); // { type: 'voice' | 'video', contact: object }
     const scrollRef = useRef(null);
     const emojiPickerRef = useRef(null);
 
@@ -106,6 +110,53 @@ const Chat = () => {
         enabled: !!selectedContact,
         refetchInterval: 10000 // Increased interval to reduce jumpiness
     });
+
+    // Initialize Socket
+    useEffect(() => {
+        if (user && user.id) {
+            console.log("--- CALL DEBUG: Initializing Socket for User:", user.id);
+            const socket = initiateSocket(user.id);
+
+            const handleRegistration = () => {
+                console.log("--- CALL DEBUG: Socket Connected. Registering UID:", user.id);
+                socket.emit('register', user.id);
+            };
+
+            if (socket.connected) {
+                handleRegistration();
+            }
+
+            socket.on('connect', handleRegistration);
+
+            socket.on('incoming-call', (data) => {
+                console.log("--- CALL DEBUG: Incoming Call Received from:", data.name, data);
+                
+                setActiveCall(prev => {
+                    if (prev) {
+                        console.log("--- CALL DEBUG: Already in a call, ignoring.");
+                        return prev;
+                    }
+                    return { type: 'video', contact: null, incomingData: data };
+                });
+
+                toast(`Incoming call from ${data.name}`, { 
+                    icon: '📞',
+                    duration: 10000,
+                    position: 'top-center',
+                    style: {
+                        borderRadius: '10px',
+                        background: '#333',
+                        color: '#fff',
+                    },
+                });
+            });
+
+            return () => {
+                console.log("--- CALL DEBUG: Disconnecting Socket");
+                disconnectSocket();
+            };
+        }
+    }, [user?.id]);
 
     // Scroll to bottom on new messages
     useEffect(() => {
@@ -386,7 +437,12 @@ const Chat = () => {
                                         <TooltipProvider>
                                             <Tooltip>
                                                 <TooltipTrigger asChild>
-                                                    <Button variant="ghost" size="icon" className="rounded-xl text-slate-400 hover:text-indigo-600 hover:bg-indigo-50">
+                                                    <Button 
+                                                        variant="ghost" 
+                                                        size="icon" 
+                                                        className="rounded-xl text-slate-400 hover:text-indigo-600 hover:bg-indigo-50"
+                                                        onClick={() => setActiveCall({ type: 'voice', contact: selectedContact })}
+                                                    >
                                                         <Phone className="w-4 h-4 md:w-5 md:h-5" />
                                                     </Button>
                                                 </TooltipTrigger>
@@ -394,7 +450,12 @@ const Chat = () => {
                                             </Tooltip>
                                             <Tooltip>
                                                 <TooltipTrigger asChild>
-                                                    <Button variant="ghost" size="icon" className="rounded-xl text-slate-400 hover:text-indigo-600 hover:bg-indigo-50">
+                                                    <Button 
+                                                        variant="ghost" 
+                                                        size="icon" 
+                                                        className="rounded-xl text-slate-400 hover:text-indigo-600 hover:bg-indigo-50"
+                                                        onClick={() => setActiveCall({ type: 'video', contact: selectedContact })}
+                                                    >
                                                         <Video className="w-4 h-4 md:w-5 md:h-5" />
                                                     </Button>
                                                 </TooltipTrigger>
@@ -683,6 +744,24 @@ const Chat = () => {
                     </div>
                 )}
             </div>
+
+            {/* Media Call Interface Overlay */}
+            <AnimatePresence>
+                {activeCall && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                    >
+                        <MediaCall 
+                            user={user} 
+                            selectedContact={activeCall.contact} 
+                            incomingCallData={activeCall.incomingData}
+                            onEndCall={() => setActiveCall(null)} 
+                        />
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 };
