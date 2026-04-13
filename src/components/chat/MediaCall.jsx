@@ -79,9 +79,14 @@ const MediaCall = ({ user, selectedContact, incomingCallData, onEndCall }) => {
     };
 
     const callUser = async (id) => {
+        if (!id) return;
+        console.log("--- CALL DEBUG: Initiating call to UID:", id);
         setIsCalling(true);
         const currentStream = await startStream();
-        if (!currentStream) return;
+        if (!currentStream) {
+            console.error("--- CALL DEBUG: Could not get media stream");
+            return;
+        }
 
         const peer = new Peer({
             initiator: true,
@@ -91,6 +96,7 @@ const MediaCall = ({ user, selectedContact, incomingCallData, onEndCall }) => {
         });
 
         peer.on('signal', (data) => {
+            console.log("--- CALL DEBUG: Signal generated, sending to server for UID:", id);
             socket.current.emit('call-user', {
                 userToCall: id,
                 signalData: data,
@@ -100,12 +106,14 @@ const MediaCall = ({ user, selectedContact, incomingCallData, onEndCall }) => {
         });
 
         peer.on('stream', (userStream) => {
+            console.log("--- CALL DEBUG: Remote stream received");
             if (userVideo.current) {
                 userVideo.current.srcObject = userStream;
             }
         });
 
         socket.current.on('call-accepted', (signal) => {
+            console.log("--- CALL DEBUG: Call accepted by recipient");
             setCallAccepted(true);
             setIsCalling(false);
             peer.signal(signal);
