@@ -421,6 +421,14 @@ const Chat = () => {
 
         setIsUploading(true);
         try {
+            if (!user || !user.token) {
+                console.error('Chat.jsx: Missing authentication token!');
+                toast.error('Session error. Please logout and login again.');
+                return;
+            }
+
+            console.log('Chat.jsx: Uploading media with token:', user.token.substring(0, 10) + '...');
+            
             const formData = new FormData();
             formData.append('file', file);
             const { data } = await axios.post('/api/upload/media', formData, {

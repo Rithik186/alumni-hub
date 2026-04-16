@@ -44,17 +44,26 @@ export const protect = async (req, res, next) => {
             const user = userCheck.rows[0];
             authCache.set(cacheKey, { user, expiry: Date.now() + AUTH_CACHE_TTL });
 
-
             req.user = user; 
-            next();
+            return next();
         } catch (error) {
-            console.error('Auth Error:', error.message);
-            res.status(401).json({ message: 'Not authorized, token failed' });
+            console.error('--- AUTH MIDDLEWARE ERROR ---');
+            console.error('Token:', token ? 'Present' : 'Missing');
+            console.error('Error:', error.message);
+            
+            return res.status(401).json({ 
+                message: 'Not authorized, token failed', 
+                error: error.message,
+                details: 'The token provided is invalid, expired, or malformed.'
+            });
         }
     }
 
     if (!token) {
-        return res.status(401).json({ message: 'Not authorized, no token' });
+        return res.status(401).json({ 
+            message: 'Not authorized, no token provided',
+            details: 'Authorization header is missing or does not use the Bearer scheme.'
+        });
     }
 }
 

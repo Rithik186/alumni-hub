@@ -13,12 +13,9 @@ export const updateProfilePicture = async (req, res) => {
         const userRes = await db.query('SELECT profile_picture FROM users WHERE id = $1', [req.user.id]);
         const oldPicUrl = userRes.rows[0]?.profile_picture;
 
-        // 2. Upload new one to Cloudinary
-        const fileBase64 = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
-        const result = await cloudinary.uploader.upload(fileBase64, {
-            folder: 'alumni_platform/profiles',
-            resource_type: 'image'
-        });
+        // 2. Upload new one to Cloudinary using stream for better performance
+        console.log('Starting Stream Upload for Profile...');
+        const result = await streamUpload(req.file.buffer, 'alumni_platform/profiles');
         
         const profile_picture_url = result.secure_url;
 
@@ -58,14 +55,9 @@ export const uploadMedia = async (req, res) => {
 
         console.log(`File received: ${req.file.originalname} (${req.file.size} bytes, ${req.file.mimetype})`);
 
-        // Convert buffer to Base64
-        const fileBase64 = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
-
-        console.log('Calling Cloudinary API...');
-        const result = await cloudinary.uploader.upload(fileBase64, {
-            folder: 'alumni_platform/chat', // Use a dedicated chat folder
-            resource_type: 'auto'
-        });
+        // Use streamUpload for better performance and to handle larger files
+        console.log('Starting Stream Upload to Cloudinary...');
+        const result = await streamUpload(req.file.buffer, 'alumni_platform/chat');
         
         console.log('SUCCESS: Cloudinary URL generated:', result.secure_url);
         
@@ -78,6 +70,7 @@ export const uploadMedia = async (req, res) => {
         res.status(500).json({ 
             message: 'Upload failed', 
             error: err.message,
+            cloudinaryError: err.http_code ? { code: err.http_code, message: err.message } : undefined,
             stack: process.env.NODE_ENV === 'development' ? err.stack : undefined 
         });
     }
