@@ -1,9 +1,14 @@
 
 import db from '../config/db.js';
+import { appCache } from '../utils/cache.js';
 
 // GET /api/settings - Get user settings
 export const getSettings = async (req, res) => {
     try {
+        const cacheKey = `settings_${req.user.id}`;
+        const cached = appCache.get(cacheKey);
+        if (cached) return res.json(cached);
+
         const result = await db.query(
             'SELECT * FROM user_settings WHERE user_id = $1',
             [req.user.id]
@@ -15,9 +20,11 @@ export const getSettings = async (req, res) => {
                 'INSERT INTO user_settings (user_id) VALUES ($1) RETURNING *',
                 [req.user.id]
             );
+            appCache.set(cacheKey, newRow.rows[0], 5 * 60 * 1000);
             return res.json(newRow.rows[0]);
         }
 
+        appCache.set(cacheKey, result.rows[0], 5 * 60 * 1000);
         res.json(result.rows[0]);
     } catch (error) {
         console.error('Settings Error:', error);

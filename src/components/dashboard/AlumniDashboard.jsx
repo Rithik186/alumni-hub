@@ -264,7 +264,7 @@ const AlumniDashboard = () => {
     const { data: unreadCount = 0 } = useQuery({
         queryKey: ['notifications', 'unread-count'],
         queryFn: async () => (await axios.get('/api/notifications/unread-count', authHeader(user.token))).data.count,
-        refetchInterval: 10000, // Every 10s is enough for real-time feel
+        refetchInterval: 60000, // Every 60s is sufficient
     });
 
     const { data: notifications = [] } = useQuery({
@@ -287,8 +287,8 @@ const AlumniDashboard = () => {
             const { data } = await axios.get('/api/posts/feed', authHeader(user.token));
             return Array.isArray(data) ? data : [];
         },
-        staleTime: 5 * 60 * 1000,
-        refetchInterval: 5 * 60 * 1000,
+        staleTime: 2 * 60 * 1000,
+        refetchInterval: 2 * 60 * 1000,
         refetchOnWindowFocus: false,
         retry: 2,
     });

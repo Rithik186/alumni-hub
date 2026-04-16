@@ -75,13 +75,18 @@ export const unfollowUser = async (req, res) => {
 export const getConnectionStats = async (req, res) => {
     const userId = req.user.id;
     try {
-        // Only count accepted follows
-        const followers = await db.query('SELECT COUNT(*) FROM follows WHERE following_id = $1 AND status = \'accepted\'', [userId]);
-        const following = await db.query('SELECT COUNT(*) FROM follows WHERE follower_id = $1 AND status = \'accepted\'', [userId]);
+        // Single query instead of two separate ones
+        const result = await db.query(`
+            SELECT 
+                COUNT(*) FILTER (WHERE following_id = $1 AND status = 'accepted') as followers,
+                COUNT(*) FILTER (WHERE follower_id = $1 AND status = 'accepted') as following
+            FROM follows
+            WHERE (following_id = $1 OR follower_id = $1) AND status = 'accepted'
+        `, [userId]);
 
         res.json({
-            followers: parseInt(followers.rows[0].count),
-            following: parseInt(following.rows[0].count)
+            followers: parseInt(result.rows[0].followers),
+            following: parseInt(result.rows[0].following)
         });
     } catch (err) {
         res.status(500).json({ message: err.message });

@@ -19,8 +19,14 @@ const io = new Server(httpServer, {
   }
 });
 
-// Socket.io for WebRTC signaling
+// Socket.io for WebRTC signaling + Chat presence + Message status
 const users = new Map(); // userId -> Set of socketIds
+
+// Helper: broadcast online users list to everyone
+const broadcastOnlineUsers = () => {
+  const onlineIds = Array.from(users.keys());
+  io.emit('online-users', onlineIds);
+};
 
 io.on('connection', (socket) => {
   console.log('--- Socket Connected:', socket.id);
@@ -35,8 +41,53 @@ io.on('connection', (socket) => {
     users.get(uid).add(socket.id);
     
     console.log(`--- User Registered: UID=${uid} | Sockets=${users.get(uid).size} | GlobalUsers=${users.size}`);
+    
+    // Broadcast updated online users to everyone
+    broadcastOnlineUsers();
   });
 
+  // ── Chat message events ──────────────────────────────────────────
+  socket.on('new-message', ({ to, message }) => {
+    const targetUid = to?.toString();
+    const targetSockets = users.get(targetUid);
+    if (targetSockets && targetSockets.size > 0) {
+      targetSockets.forEach(socketId => {
+        io.to(socketId).emit('receive-message', message);
+      });
+    }
+  });
+
+  socket.on('message-delivered', ({ to, senderId }) => {
+    const targetUid = to?.toString();
+    const targetSockets = users.get(targetUid);
+    if (targetSockets) {
+      targetSockets.forEach(socketId => {
+        io.to(socketId).emit('messages-delivered', { by: senderId });
+      });
+    }
+  });
+
+  socket.on('message-read', ({ to, senderId }) => {
+    const targetUid = to?.toString();
+    const targetSockets = users.get(targetUid);
+    if (targetSockets) {
+      targetSockets.forEach(socketId => {
+        io.to(socketId).emit('messages-read', { by: senderId });
+      });
+    }
+  });
+
+  socket.on('typing', ({ to }) => {
+    const targetUid = to?.toString();
+    const targetSockets = users.get(targetUid);
+    if (targetSockets) {
+      targetSockets.forEach(socketId => {
+        io.to(socketId).emit('user-typing', { from: socket.userId });
+      });
+    }
+  });
+
+  // ── WebRTC Call events ───────────────────────────────────────────
   socket.on('call-user', ({ userToCall, signalData, from, name }) => {
     const targetUid = userToCall?.toString();
     
@@ -49,7 +100,6 @@ io.on('connection', (socket) => {
           io.to(socketId).emit('incoming-call', { signal: signalData, from, name });
         });
       } else if (retryCount < 2) {
-        // Wait 1 second and try again (handles user refreshes/reconnects)
         console.log(`--- Target offline, retrying call in 1s...`);
         setTimeout(() => attemptCall(retryCount + 1), 1000);
       } else {
@@ -91,6 +141,8 @@ io.on('connection', (socket) => {
         break;
       }
     }
+    // Broadcast updated online status
+    broadcastOnlineUsers();
   });
 });
 

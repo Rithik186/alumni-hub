@@ -1,7 +1,15 @@
 import db from '../config/db.js';
+import { appCache } from '../utils/cache.js';
 
 // Get all upcoming events with alumni count insights
 export const getEvents = async (req, res) => {
+    const cacheKey = 'global_events_list';
+    const cachedData = appCache.get(cacheKey);
+    
+    if (cachedData) {
+        return res.json(cachedData);
+    }
+    
     try {
         const result = await db.query(
             `SELECT e.*, 
@@ -13,6 +21,8 @@ export const getEvents = async (req, res) => {
              ORDER BY e.date DESC`
         );
 
+        appCache.set(cacheKey, result.rows, 30 * 1000); // 30s cache
+        res.set('Cache-Control', 'public, max-age=30');
         res.json(result.rows);
     } catch (error) {
         console.error('Get Events Error:', error);

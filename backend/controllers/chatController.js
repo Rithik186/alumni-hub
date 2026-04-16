@@ -16,12 +16,11 @@ export const getContacts = async (req, res) => {
             WHERE u.id != $1 AND (f.status = 'accepted' OR m.id IS NOT NULL)
         `;
         const result = await db.query(query, [userId]);
-        // Map data to match expected shape
         const contacts = result.rows.map(r => ({
             id: r.id,
             name: r.name,
             role: r.status_role,
-            status: 'online', // Mock online status for now
+            status: 'offline',
             avatar: r.avatar
         }));
         res.json(contacts);
@@ -40,7 +39,8 @@ export const getMessages = async (req, res) => {
 
     try {
         const query = `
-            SELECT id, sender_id as "senderId", receiver_id as "receiverId", content as text, created_at as timestamp, image_url, video_url
+            SELECT id, sender_id as "senderId", receiver_id as "receiverId", content as text, 
+                   created_at as timestamp, image_url, video_url, audio_url, status
             FROM messages
             WHERE (sender_id = $1 AND receiver_id = $2) OR (sender_id = $2 AND receiver_id = $1)
             ORDER BY created_at ASC
@@ -54,7 +54,7 @@ export const getMessages = async (req, res) => {
 
 export const sendMessage = async (req, res) => {
     const senderId = req.user.id;
-    const { receiverId, text, image_url, video_url } = req.body;
+    const { receiverId, text, image_url, video_url, audio_url } = req.body;
     const targetId = parseInt(receiverId);
 
     if (isNaN(targetId)) {
@@ -63,14 +63,44 @@ export const sendMessage = async (req, res) => {
 
     try {
         const query = `
-            INSERT INTO messages (sender_id, receiver_id, content, image_url, video_url)
-            VALUES ($1, $2, $3, $4, $5)
-            RETURNING id, sender_id as "senderId", receiver_id as "receiverId", content as text, created_at as timestamp, image_url, video_url
+            INSERT INTO messages (sender_id, receiver_id, content, image_url, video_url, audio_url, status)
+            VALUES ($1, $2, $3, $4, $5, $6, 'sent')
+            RETURNING id, sender_id as "senderId", receiver_id as "receiverId", content as text, 
+                      created_at as timestamp, image_url, video_url, audio_url, status
         `;
-        // Ensure content is not null (DB requirement)
-        const content = text || (image_url || video_url ? '' : ' ');
-        const result = await db.query(query, [senderId, targetId, content, image_url || null, video_url || null]);
+        const content = text || (image_url || video_url || audio_url ? '' : ' ');
+        const result = await db.query(query, [senderId, targetId, content, image_url || null, video_url || null, audio_url || null]);
         res.json(result.rows[0]);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+};
+
+// Mark messages as delivered (double grey tick)
+export const markDelivered = async (req, res) => {
+    const userId = req.user.id;
+    const { senderId } = req.params;
+    try {
+        await db.query(
+            `UPDATE messages SET status = 'delivered' WHERE receiver_id = $1 AND sender_id = $2 AND status = 'sent'`,
+            [userId, senderId]
+        );
+        res.json({ message: 'Marked as delivered' });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+};
+
+// Mark messages as read (blue double tick)
+export const markRead = async (req, res) => {
+    const userId = req.user.id;
+    const { senderId } = req.params;
+    try {
+        await db.query(
+            `UPDATE messages SET status = 'read', is_read = true WHERE receiver_id = $1 AND sender_id = $2 AND status != 'read'`,
+            [userId, senderId]
+        );
+        res.json({ message: 'Marked as read' });
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
@@ -90,7 +120,8 @@ export const editMessage = async (req, res) => {
             UPDATE messages 
             SET content = $1
             WHERE id = $2 
-            RETURNING id, sender_id as "senderId", receiver_id as "receiverId", content as text, created_at as timestamp, image_url, video_url
+            RETURNING id, sender_id as "senderId", receiver_id as "receiverId", content as text, 
+                      created_at as timestamp, image_url, video_url, audio_url, status
         `;
         const result = await db.query(updateQuery, [text, id]);
         res.json(result.rows[0]);

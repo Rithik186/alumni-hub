@@ -1,11 +1,12 @@
 import db from '../config/db.js';
+import { appCache } from '../utils/cache.js';
 
 export const editPost = async (req, res) => {
     const { id } = req.params;
     const { content, image_url, video_url } = req.body;
     const userId = req.user.id;
     try {
-        const post = await db.query('SELECT * FROM posts WHERE id = $1', [id]);
+        const post = await db.query('SELECT id, user_id FROM posts WHERE id = $1', [id]);
         if (post.rows.length === 0) return res.status(404).json({ message: 'Post not found' });
         if (post.rows[0].user_id !== userId) return res.status(403).json({ message: 'Unauthorized' });
 
@@ -38,12 +39,24 @@ export const getFeed = async (req, res) => {
     const { page = 1, limit = 10 } = req.query;
     const offset = Math.max(0, (parseInt(page) - 1) * parseInt(limit));
     const pageSize = parseInt(limit);
+    const cacheKey = `feed_${userId}_${page}_${limit}`;
+    const cachedData = appCache.get(cacheKey);
+    if (cachedData) {
+        return res.json(cachedData);
+    }
 
     try {
         // Optimized Feed Query
         // 1. Pre-fetch user college safely
-        const userSettings = await db.query('SELECT college FROM users WHERE id = $1', [userId]);
-        const userCollege = userSettings.rows[0]?.college || null;
+        // To save even more DB queries, cache the college lookup:
+        const collegeCacheKey = `college_${userId}`;
+        let userCollege = appCache.get(collegeCacheKey);
+        
+        if (!userCollege && userCollege !== null) {
+            const userSettings = await db.query('SELECT college FROM users WHERE id = $1', [userId]);
+            userCollege = userSettings.rows[0]?.college || null;
+            appCache.set(collegeCacheKey, userCollege, 5 * 60 * 1000); // cache user college for 5 mins
+        }
 
         const feed = await db.query(`
             SELECT 
@@ -53,9 +66,9 @@ export const getFeed = async (req, res) => {
                 COALESCE(stats.dislikes_count, 0) as dislikes_count,
                 COALESCE(cc.comments_count, 0) as comments_count,
                 EXISTS(SELECT 1 FROM post_likes pl WHERE pl.post_id = p.id AND pl.user_id = $1 AND pl.is_dislike = FALSE) as has_liked,
-                (SELECT COALESCE(json_agg(json_build_object('name', lu.name, 'profile_picture', lu.profile_picture)), '[]'::json) 
+                (SELECT COALESCE(json_agg(json_build_object('name', lu.name, 'profile_picture', LEFT(lu2_pp, 80))), '[]'::json) 
                  FROM (
-                    SELECT lu2.name, lu2.profile_picture
+                    SELECT lu2.name, lu2.profile_picture as lu2_pp
                     FROM post_likes pl2 
                     JOIN users lu2 ON pl2.user_id = lu2.id 
                     WHERE pl2.post_id = p.id AND pl2.is_dislike = FALSE
@@ -81,6 +94,11 @@ export const getFeed = async (req, res) => {
             LIMIT $2 OFFSET $3
         `, [userId, pageSize, offset, userCollege]);
 
+        // Cache the feed result for 60 seconds
+        appCache.set(cacheKey, feed.rows, 60 * 1000);
+
+        // Add HTTP Cache-Control header since data is cached for 30 seconds anyway
+        res.set('Cache-Control', 'public, max-age=30');
         res.json(feed.rows);
     } catch (err) {
         console.error('CRITICAL: Feed loading failure:', {
@@ -104,7 +122,7 @@ export const toggleLike = async (req, res) => {
     const { isDislike } = req.body;
     const userId = req.user.id;
     try {
-        const existing = await db.query('SELECT * FROM post_likes WHERE post_id = $1 AND user_id = $2', [postId, userId]);
+        const existing = await db.query('SELECT id, is_dislike FROM post_likes WHERE post_id = $1 AND user_id = $2', [postId, userId]);
 
         let action = '';
         if (existing.rows.length > 0) {
@@ -213,7 +231,7 @@ export const toggleCommentLike = async (req, res) => {
     const { commentId } = req.params;
     const userId = req.user.id;
     try {
-        const existing = await db.query('SELECT * FROM comment_likes WHERE comment_id = $1 AND user_id = $2', [commentId, userId]);
+        const existing = await db.query('SELECT id FROM comment_likes WHERE comment_id = $1 AND user_id = $2', [commentId, userId]);
         if (existing.rows.length > 0) {
             await db.query('DELETE FROM comment_likes WHERE id = $1', [existing.rows[0].id]);
         } else {
@@ -254,7 +272,7 @@ export const deletePost = async (req, res) => {
     const { id } = req.params;
     const userId = req.user.id;
     try {
-        const post = await db.query('SELECT * FROM posts WHERE id = $1', [id]);
+        const post = await db.query('SELECT id, user_id FROM posts WHERE id = $1', [id]);
         if (post.rows.length === 0) {
             return res.json({ message: 'Post not found' });
         }

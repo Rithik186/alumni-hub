@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import compression from 'compression';
 import dotenv from 'dotenv';
 import authRoutes from './routes/authRoutes.js';
 import alumniRoutes from './routes/alumniRoutes.js';
@@ -24,6 +25,7 @@ dotenv.config();
 const app = express();
 
 // Middleware
+app.use(compression()); // gzip all responses — reduces bandwidth by 70-90%
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(cors());

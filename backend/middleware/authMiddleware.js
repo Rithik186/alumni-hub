@@ -2,6 +2,18 @@
 import jwt from 'jsonwebtoken';
 import db from '../config/db.js';
 
+// In-memory cache for validated tokens (avoids DB hit on every request)
+const authCache = new Map();
+const AUTH_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+// Cleanup stale entries every 10 minutes
+setInterval(() => {
+    const now = Date.now();
+    for (const [key, val] of authCache.entries()) {
+        if (now > val.expiry) authCache.delete(key);
+    }
+}, 10 * 60 * 1000);
+
 export const protect = async (req, res, next) => {
     let token;
 
@@ -15,13 +27,23 @@ export const protect = async (req, res, next) => {
                 return res.status(401).json({ message: 'Invalid token payload' });
             }
 
-            // Database Sync check: Ensure user still exists in DB
+            // Check in-memory cache first (avoid DB round-trip)
+            const cached = authCache.get(decoded.id);
+            if (cached && Date.now() < cached.expiry) {
+                req.user = cached.user;
+                return next();
+            }
+
+            // Cache miss — hit DB once, then cache for 5 min
             const userCheck = await db.query('SELECT id, role FROM users WHERE id = $1', [decoded.id]);
             if (userCheck.rows.length === 0) {
                 return res.status(401).json({ message: 'User no longer exists. please login again.' });
             }
 
-            req.user = userCheck.rows[0]; 
+            const user = userCheck.rows[0];
+            authCache.set(decoded.id, { user, expiry: Date.now() + AUTH_CACHE_TTL });
+
+            req.user = user; 
             next();
         } catch (error) {
             console.error('Auth Error:', error.message);

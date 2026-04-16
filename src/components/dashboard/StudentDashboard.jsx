@@ -284,8 +284,8 @@ const StudentDashboard = () => {
             const { data } = await axios.get('/api/posts/feed', authHeader(user.token));
             return Array.isArray(data) ? data : [];
         },
-        staleTime: 5 * 60 * 1000,
-        refetchInterval: 5 * 60 * 1000,
+        staleTime: 2 * 60 * 1000,
+        refetchInterval: 2 * 60 * 1000,
         refetchOnWindowFocus: false,
         retry: 2,
     });
@@ -294,7 +294,7 @@ const StudentDashboard = () => {
     const { data: eventsList = [] } = useQuery({
         queryKey: ['events'],
         queryFn: async () => (await axios.get('/api/events', authHeader(user.token))).data,
-        staleTime: 10 * 1000,
+        staleTime: 5 * 60 * 1000,
     });
 
 

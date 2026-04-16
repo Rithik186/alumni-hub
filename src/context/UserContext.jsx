@@ -9,9 +9,27 @@ export const UserProvider = ({ children }) => {
     useEffect(() => {
         const storedUser = localStorage.getItem('user');
         if (storedUser) {
-            setUser(JSON.parse(storedUser));
+            const parsed = JSON.parse(storedUser);
+            // Validate the stored token against the current database
+            fetch('/api/auth/me', { headers: { Authorization: `Bearer ${parsed.token}` } })
+                .then(res => {
+                    if (res.ok) {
+                        setUser(parsed);
+                    } else {
+                        // Token is stale or user doesn't exist in current DB — clear it
+                        console.warn('Stale session detected, logging out automatically.');
+                        localStorage.removeItem('user');
+                    }
+                    setLoading(false);
+                })
+                .catch(() => {
+                    // Network error — still load the cached user so offline works
+                    setUser(parsed);
+                    setLoading(false);
+                });
+        } else {
+            setLoading(false);
         }
-        setLoading(false);
     }, []);
 
     const logout = () => {

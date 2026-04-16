@@ -7,8 +7,11 @@ import './index.css';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      refetchOnWindowFocus: true,
-      retry: 2,
+      refetchOnWindowFocus: false, // Prevents refetching when switching tabs
+      refetchOnMount: false, // Prevents refetching when navigating back to a page
+      staleTime: 5 * 60 * 1000, // Data remains fresh for 5 minutes
+      gcTime: 30 * 60 * 1000,   // Keep in cache for 30 minutes
+      retry: 1, // Minimize retry spam on errors
     },
   },
 });

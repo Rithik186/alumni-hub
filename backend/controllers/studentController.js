@@ -76,7 +76,7 @@ export const searchAlumni = async (req, res) => {
             paramCount++;
         }
 
-        query += ` ORDER BY u.created_at DESC`;
+        query += ` ORDER BY u.created_at DESC LIMIT 50`;
 
         const result = await db.query(query, params);
         res.status(200).json(result.rows);

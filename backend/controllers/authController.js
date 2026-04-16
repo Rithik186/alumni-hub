@@ -17,7 +17,7 @@ export const registerUser = async (req, res) => {
 
     try {
         // 1. Check if user exists
-        const userExists = await db.query('SELECT * FROM users WHERE email = $1 OR phone_number = $2', [email, phone_number]);
+        const userExists = await db.query('SELECT id FROM users WHERE email = $1 OR phone_number = $2', [email, phone_number]);
         if (userExists.rows.length > 0) {
             return res.status(400).json({ message: 'User already exists with this email or phone number' });
         }
@@ -83,7 +83,7 @@ export const verifyOtp = async (req, res) => {
     const { email, phone_number, otp_code } = req.body;
 
     try {
-        const userResult = await db.query('SELECT * FROM users WHERE email = $1 OR phone_number = $2', [email, phone_number]);
+        const userResult = await db.query('SELECT id, name, email, role, profile_picture, otp_code, otp_expiry, is_verified FROM users WHERE email = $1 OR phone_number = $2', [email, phone_number]);
         const user = userResult.rows[0];
 
         if (!user || user.otp_code !== otp_code) {
@@ -119,7 +119,7 @@ export const loginUser = async (req, res) => {
     const { email, password } = req.body;
 
     try {
-        const userResult = await db.query('SELECT * FROM users WHERE email = $1', [email]);
+        const userResult = await db.query('SELECT id, name, email, role, profile_picture, password_hash, is_verified, is_approved, is_active FROM users WHERE email = $1', [email]);
         const user = userResult.rows[0];
 
         if (user && (await bcrypt.compare(password, user.password_hash))) {
@@ -178,10 +178,10 @@ export const getMe = async (req, res) => {
         const user = userRes.rows[0];
         let profile = null;
         if (user.role === 'student') {
-            const spRes = await db.query('SELECT * FROM student_profiles WHERE user_id = $1', [req.user.id]);
+            const spRes = await db.query('SELECT user_id, department, register_number, batch, bio, skills FROM student_profiles WHERE user_id = $1', [req.user.id]);
             profile = spRes.rows[0];
         } else if (user.role === 'alumni') {
-            const apRes = await db.query('SELECT * FROM alumni_profiles WHERE user_id = $1', [req.user.id]);
+            const apRes = await db.query('SELECT user_id, company, job_role, department, batch, bio, skills, experience_level, mentorship_available FROM alumni_profiles WHERE user_id = $1', [req.user.id]);
             profile = apRes.rows[0];
         }
 
@@ -207,10 +207,10 @@ export const getUserProfile = async (req, res) => {
         const user = userRes.rows[0];
         let profile = null;
         if (user.role === 'student') {
-            const spRes = await db.query('SELECT * FROM student_profiles WHERE user_id = $1', [id]);
+            const spRes = await db.query('SELECT user_id, department, register_number, batch, bio, skills FROM student_profiles WHERE user_id = $1', [id]);
             profile = spRes.rows[0];
         } else if (user.role === 'alumni') {
-            const apRes = await db.query('SELECT * FROM alumni_profiles WHERE user_id = $1', [id]);
+            const apRes = await db.query('SELECT user_id, company, job_role, department, batch, bio, skills, experience_level, mentorship_available FROM alumni_profiles WHERE user_id = $1', [id]);
             profile = apRes.rows[0];
         }
 
@@ -267,7 +267,7 @@ export const forgotPassword = async (req, res) => {
     const { email } = req.body;
 
     try {
-        const userResult = await db.query('SELECT * FROM users WHERE email = $1', [email]);
+        const userResult = await db.query('SELECT id, name, email FROM users WHERE email = $1', [email]);
         const user = userResult.rows[0];
 
         if (!user) {
@@ -300,7 +300,7 @@ export const resetPassword = async (req, res) => {
     const { email, oldPassword, otp, newPassword } = req.body;
 
     try {
-        const userResult = await db.query('SELECT * FROM users WHERE email = $1', [email]);
+        const userResult = await db.query('SELECT id, email, password_hash, otp_code, otp_expiry FROM users WHERE email = $1', [email]);
         const user = userResult.rows[0];
 
         if (!user) {
