@@ -63,7 +63,11 @@ const CreatePostCard = ({ user }) => {
             const { data } = await axios.post('/api/upload/media', fd, authHeader(user.token));
             if (type === 'image') { setImageUrl(data.url); setVideoUrl(''); }
             else { setVideoUrl(data.url); setImageUrl(''); }
-        } catch { /* silently fail */ }
+        } catch (err) {
+            console.error('Frontend Upload Error:', err);
+            // alert('Upload failed. Please check the console for details.');
+        }
+
         setUploading(false);
     };
 

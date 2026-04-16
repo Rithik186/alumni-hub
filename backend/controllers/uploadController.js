@@ -49,15 +49,20 @@ export const uploadMedia = async (req, res) => {
         console.log('--- CHAT MEDIA UPLOAD ATTEMPT ---');
         
         if (!req.file) {
-            console.error('ERROR: No file found in req.file. Check multipart/form-data config.');
+            console.error('[UploadController] ERROR: No file found in request');
             return res.status(400).json({ message: 'No file uploaded' });
         }
 
-        console.log(`File received: ${req.file.originalname} (${req.file.size} bytes, ${req.file.mimetype})`);
+        console.log(`[UploadController] Processing: ${req.file.originalname} | Size: ${req.file.size} | Mimetype: ${req.file.mimetype}`);
+        
+        if (!req.file.buffer || req.file.buffer.length === 0) {
+            console.error('[UploadController] ERROR: File buffer is empty or missing');
+            return res.status(400).json({ message: 'File buffer is empty' });
+        }
 
-        // Use streamUpload for better performance and to handle larger files
-        console.log('Starting Stream Upload to Cloudinary...');
+        console.log('[UploadController] Triggering streamUpload...');
         const result = await streamUpload(req.file.buffer, 'alumni_platform/chat');
+
         
         console.log('SUCCESS: Cloudinary URL generated:', result.secure_url);
         

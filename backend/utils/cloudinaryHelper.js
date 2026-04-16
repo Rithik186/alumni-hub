@@ -3,6 +3,8 @@ import cloudinary from '../config/cloudinary.js';
 
 export const streamUpload = (fileBuffer, folder) => {
     return new Promise((resolve, reject) => {
+        console.log(`[Cloudinary] Starting upload for buffer (size: ${fileBuffer.length}) into folder: ${folder}`);
+        
         const stream = cloudinary.uploader.upload_stream(
             { 
                 folder: folder,
@@ -10,15 +12,20 @@ export const streamUpload = (fileBuffer, folder) => {
             },
             (error, result) => {
                 if (result) {
+                    console.log('[Cloudinary] Upload success:', result.secure_url);
                     resolve(result);
                 } else {
+                    console.error('[Cloudinary] Upload Error Details:', error);
                     reject(error);
                 }
             }
         );
-        Readable.from(fileBuffer).pipe(stream);
+
+        // More robust way to send buffer to the stream
+        stream.end(fileBuffer);
     });
 };
+
 
 export const deleteMediaFromCloudinary = async (url) => {
     if (!url || !url.includes('cloudinary.com')) return;
