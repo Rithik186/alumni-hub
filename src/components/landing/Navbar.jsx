@@ -3,7 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
     User, LogOut, LayoutDashboard,
     Settings, Bell, Zap, ChevronDown,
-    Activity, Menu, X
+    Activity, Menu, X, Sparkles
 } from 'lucide-react';
 import { useUser } from '../../context/UserContext';
 
@@ -45,9 +45,9 @@ export const Navbar = () => {
             <nav className="fixed top-0 left-0 right-0 z-[150] h-14 bg-white border-b border-slate-200 shadow-sm">
                 <div className="w-full h-full px-4 lg:px-5 flex items-center justify-between">
                     {/* Logo — icon only, no text */}
-                    <Link to="/" className="flex items-center gap-2 group">
-                        <div className="w-9 h-9 bg-slate-900 rounded-xl flex items-center justify-center text-white group-hover:bg-indigo-600 transition-colors shadow-sm">
-                            <Zap className="w-4.5 h-4.5 fill-current" />
+                    <Link to="/" className="flex items-center gap-2 group relative">
+                        <div className="w-10 h-10 bg-white border border-slate-200 rounded-xl flex items-center justify-center shadow-sm group-hover:border-indigo-200 group-hover:bg-indigo-50/30 transition-all overflow-hidden p-0.5">
+                            <img src="/logo.png" alt="Alumned In" className="w-full h-full object-contain scale-110" />
                         </div>
                     </Link>
 
@@ -146,6 +146,17 @@ export const Navbar = () => {
                                     {link.name}
                                 </Link>
                             ))}
+                            {user && (
+                                <button
+                                    onClick={() => {
+                                        setIsMobileMenuOpen(false);
+                                        window.dispatchEvent(new Event('openResumeAnalyzer'));
+                                    }}
+                                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold text-indigo-600 hover:bg-indigo-50 transition-all w-full"
+                                >
+                                    <Sparkles className="w-4 h-4" /> Resume Analyzer
+                                </button>
+                            )}
                             <div className="pt-2 mt-2 border-t border-slate-100">
                                 {user ? (
                                     <button onClick={handleLogout} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold text-red-500 hover:bg-red-50 transition-all w-full">

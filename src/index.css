@@ -31,6 +31,7 @@ html {
 }
 
 @layer components {
+
   /* ─── Core Card — used everywhere ────────────────────────── */
   .post-card {
     background: var(--card-bg);
@@ -38,8 +39,9 @@ html {
     border-radius: var(--card-radius);
     transition: box-shadow 0.15s ease;
   }
+
   .post-card:hover {
-    box-shadow: 0 1px 6px -1px rgba(0,0,0,0.06);
+    box-shadow: 0 1px 6px -1px rgba(0, 0, 0, 0.06);
   }
 
   /* ─── Legacy cards ───────────────────────────────────────── */
@@ -51,12 +53,15 @@ html {
   .btn-primary {
     @apply bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-5 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 active:scale-95 text-sm;
   }
+
   .btn-secondary {
     @apply bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-2.5 px-5 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 active:scale-95 text-sm;
   }
+
   .btn-nextlevel {
     @apply bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 px-6 rounded-xl transition-all duration-200 flex items-center justify-center gap-2 active:scale-95;
   }
+
   .btn-accent {
     @apply bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-xl transition-all duration-200 flex items-center justify-center gap-2 active:scale-95;
   }
@@ -70,6 +75,7 @@ html {
   .live-dot {
     @apply w-2 h-2 rounded-full bg-emerald-500 relative flex-shrink-0;
   }
+
   .live-dot::after {
     content: '';
     @apply absolute inset-0 rounded-full bg-emerald-500 animate-ping;
@@ -77,10 +83,22 @@ html {
 }
 
 /* ─── Scrollbars ─────────────────────────────────────────────── */
-.modern-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
-.modern-scrollbar::-webkit-scrollbar-track { background: transparent; }
-.modern-scrollbar::-webkit-scrollbar-thumb { @apply bg-slate-200 rounded-full; }
-.modern-scrollbar::-webkit-scrollbar-thumb:hover { @apply bg-slate-300; }
+.modern-scrollbar::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+.modern-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.modern-scrollbar::-webkit-scrollbar-thumb {
+  @apply bg-slate-200 rounded-full;
+}
+
+.modern-scrollbar::-webkit-scrollbar-thumb:hover {
+  @apply bg-slate-300;
+}
 
 /* ─── Gradient Text ──────────────────────────────────────────── */
 .gradient-text {
@@ -91,21 +109,27 @@ html {
 .workspace-card {
   @apply bg-white border border-slate-200 rounded-2xl shadow-sm transition-shadow duration-200 hover:shadow-md;
 }
+
 .workspace-input {
   @apply w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all duration-200 font-medium text-slate-800 placeholder:text-slate-400 text-sm;
 }
+
 .sidebar-nav-item {
   @apply flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all font-semibold text-sm;
 }
+
 .sidebar-nav-item-active {
   @apply bg-slate-900 text-white;
 }
+
 .sidebar-nav-item-inactive {
   @apply text-slate-500 hover:bg-slate-100 hover:text-slate-900;
 }
+
 .pill-filter {
   @apply shrink-0 px-5 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all border;
 }
+
 .workspace-comment-card {
   @apply bg-slate-50 rounded-2xl rounded-tl-sm;
 }
@@ -113,9 +137,17 @@ html {
 /* ═══════════════════════════════════════════════════════════════════════════ */
 /* APPEARANCE SYSTEM - Font Size                                              */
 /* ═══════════════════════════════════════════════════════════════════════════ */
-html.font-small { font-size: 87%; }
-html.font-medium { font-size: 95%; }
-html.font-large { font-size: 108%; }
+html.font-small {
+  font-size: 87%;
+}
+
+html.font-medium {
+  font-size: 95%;
+}
+
+html.font-large {
+  font-size: 108%;
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════ */
 /* APPEARANCE SYSTEM - Compact Mode                                           */
@@ -126,195 +158,359 @@ html.compact .premium-card,
 html.compact .workspace-card {
   border-radius: 8px;
 }
-html.compact .sd-card > div,
-html.compact .post-card > div {
+
+html.compact .sd-card>div,
+html.compact .post-card>div {
   padding-top: 0.5rem;
   padding-bottom: 0.5rem;
 }
+
 html.compact main {
   gap: 0.5rem;
 }
-html.compact aside .sticky > * + * {
+
+html.compact aside .sticky>*+* {
   margin-top: 0.5rem;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════ */
-/* APPEARANCE SYSTEM - Dark Mode                                              */
+/* APPEARANCE SYSTEM - Dark Mode  (Premium Redesign)                          */
 /* ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Design tokens ───────────────────────────────────────────────────────── */
 html.dark {
-  --primary: #e2e8f0;
-  --accent: #818cf8;
-  --bg-main: #0f172a;
-  --card-bg: #1e293b;
-  --card-border: #334155;
+  --primary: #eef0f6;
+  --accent: #a78bfa;
+  --bg-main: #0c0d14;
+  --bg-surface: #13141f;
+  --bg-card: #1a1b2e;
+  --bg-raised: #22243a;
+  --bg-input: #111220;
+  --card-bg: var(--bg-card);
+  --card-border: rgba(139, 92, 246, 0.08);
+  --border-subtle: rgba(148, 163, 184, 0.08);
+  --border-medium: rgba(148, 163, 184, 0.12);
+  --glow-accent: rgba(139, 92, 246, 0.15);
+  --glow-accent-strong: rgba(139, 92, 246, 0.25);
+  --text-primary: #eef0f6;
+  --text-secondary: #a1a7c4;
+  --text-muted: #6b7194;
 }
 
+/* ── Body baseline ───────────────────────────────────────────────────────── */
 html.dark body {
-  background-color: #0f172a;
-  color: #e2e8f0;
+  background-color: var(--bg-main);
+  color: var(--text-primary);
 }
 
-/* Dark mode: general backgrounds & text */
+/* ── Page background gradient — subtle depth ─────────────────────────────── */
 html.dark .min-h-screen {
-  background: linear-gradient(135deg, #0f172a 0%, #1e293b 60%, #0f172a 100%) !important;
+  background: linear-gradient(160deg,
+      #0c0d14 0%,
+      #10111d 30%,
+      #141526 60%,
+      #0e0f1a 100%) !important;
 }
+
+/* ── Surface resets ──────────────────────────────────────────────────────── */
 html.dark .bg-slate-50,
 html.dark .bg-slate-50\/50,
 html.dark .bg-white,
 html.dark .bg-white\/90,
 html.dark .bg-white\/95 {
-  background-color: #1e293b !important;
-}
-html.dark .backdrop-blur-sm {
-  background-color: rgba(30, 41, 59, 0.95) !important;
+  background-color: var(--bg-card) !important;
 }
 
-/* Dark mode: Cards */
+html.dark .backdrop-blur-sm {
+  background-color: rgba(19, 20, 31, 0.92) !important;
+}
+
+/* ── Cards ───────────────────────────────────────────────────────────────── */
 html.dark .sd-card,
 html.dark .post-card,
 html.dark .premium-card,
 html.dark .workspace-card {
-  background: #1e293b !important;
-  border-color: #334155 !important;
+  background: var(--bg-card) !important;
+  border-color: var(--border-subtle) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.02) !important;
 }
+
 html.dark .sd-card:hover,
 html.dark .post-card:hover {
-  box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.4);
+  border-color: var(--card-border) !important;
+  box-shadow: 0 4px 24px -4px rgba(0, 0, 0, 0.5),
+    0 0 0 1px var(--card-border),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03) !important;
 }
 
-/* Dark mode: Text colors */
+/* ── Text hierarchy ──────────────────────────────────────────────────────── */
 html.dark .text-slate-900,
-html.dark .text-slate-800,
-html.dark .text-slate-700 {
-  color: #e2e8f0 !important;
+html.dark .text-slate-800 {
+  color: var(--text-primary) !important;
 }
+
+html.dark .text-slate-700 {
+  color: #d1d5e8 !important;
+}
+
 html.dark .text-slate-600,
 html.dark .text-slate-500 {
-  color: #94a3b8 !important;
-}
-html.dark .text-slate-400 {
-  color: #64748b !important;
-}
-html.dark h1, html.dark h2, html.dark h3, html.dark h4, html.dark h5 {
-  color: #f1f5f9 !important;
+  color: var(--text-secondary) !important;
 }
 
-/* Dark mode: Borders */
+html.dark .text-slate-400 {
+  color: var(--text-muted) !important;
+}
+
+html.dark h1,
+html.dark h2,
+html.dark h3,
+html.dark h4,
+html.dark h5 {
+  color: var(--text-primary) !important;
+}
+
+/* ── Borders ─────────────────────────────────────────────────────────────── */
 html.dark .border-slate-100,
 html.dark .border-slate-200,
 html.dark .border-slate-200\/80,
 html.dark .border-slate-300 {
-  border-color: #334155 !important;
+  border-color: var(--border-medium) !important;
 }
 
-/* Dark mode: Inputs */
+html.dark .divide-slate-100>*+*,
+html.dark .divide-slate-200>*+* {
+  border-color: var(--border-subtle) !important;
+}
+
+/* ── Inputs — deep recessed look ─────────────────────────────────────────── */
 html.dark input,
 html.dark textarea,
 html.dark select {
-  background-color: #0f172a !important;
-  border-color: #334155 !important;
-  color: #e2e8f0 !important;
+  background-color: var(--bg-input) !important;
+  border-color: var(--border-medium) !important;
+  color: var(--text-primary) !important;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2) !important;
 }
+
 html.dark input::placeholder,
 html.dark textarea::placeholder {
-  color: #475569 !important;
+  color: #555a78 !important;
 }
+
 html.dark input:focus,
 html.dark textarea:focus,
 html.dark select:focus {
-  border-color: #6366f1 !important;
-  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15) !important;
+  border-color: #7c3aed !important;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2),
+    0 0 0 3px var(--glow-accent) !important;
 }
 
-/* Dark mode: Hover states */
+/* ── Hover states ────────────────────────────────────────────────────────── */
 html.dark .hover\:bg-slate-50:hover,
 html.dark .hover\:bg-slate-100:hover {
-  background-color: #334155 !important;
+  background-color: var(--bg-raised) !important;
 }
 
-/* Dark mode: Buttons */
+/* ── Surface-level fills (buttons, badges) ───────────────────────────────── */
 html.dark .bg-slate-50,
 html.dark .bg-slate-100 {
-  background-color: #334155 !important;
+  background-color: var(--bg-raised) !important;
 }
+
 html.dark .bg-indigo-50 {
-  background-color: rgba(99, 102, 241, 0.1) !important;
+  background-color: rgba(99, 102, 241, 0.12) !important;
 }
+
 html.dark .bg-teal-50,
 html.dark .bg-teal-50\/40 {
-  background-color: rgba(20, 184, 166, 0.1) !important;
+  background-color: rgba(20, 184, 166, 0.12) !important;
 }
+
 html.dark .bg-emerald-50 {
-  background-color: rgba(16, 185, 129, 0.1) !important;
+  background-color: rgba(16, 185, 129, 0.12) !important;
 }
+
 html.dark .bg-rose-50 {
-  background-color: rgba(244, 63, 94, 0.1) !important;
+  background-color: rgba(244, 63, 94, 0.12) !important;
 }
+
 html.dark .bg-amber-50 {
-  background-color: rgba(245, 158, 11, 0.1) !important;
+  background-color: rgba(245, 158, 11, 0.12) !important;
 }
+
 html.dark .bg-purple-50 {
-  background-color: rgba(168, 85, 247, 0.1) !important;
+  background-color: rgba(168, 85, 247, 0.12) !important;
 }
 
-/* Dark mode: Nav active states */
-html.dark .sd-nav-item:hover { background: #334155; }
-html.dark .sd-nav-item.active { background: rgba(99, 102, 241, 0.15); color: #818cf8; }
-html.dark .sd-nav-item.active svg { color: #818cf8; }
+/* ── Primary action buttons — subtle glow ────────────────────────────────── */
+html.dark .bg-indigo-600 {
+  background: linear-gradient(135deg, #6366f1, #7c3aed) !important;
+  box-shadow: 0 2px 12px -2px rgba(99, 102, 241, 0.4) !important;
+}
 
-/* Dark mode: Sidebar active nav text */
+html.dark .bg-indigo-600:hover {
+  box-shadow: 0 4px 20px -2px rgba(99, 102, 241, 0.5) !important;
+}
+
+/* ── Sidebar nav items ───────────────────────────────────────────────────── */
+html.dark .sd-nav-item:hover {
+  background: var(--bg-raised);
+}
+
+html.dark .sd-nav-item.active {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(139, 92, 246, 0.1));
+  color: #a78bfa;
+  border-color: rgba(139, 92, 246, 0.2);
+}
+
+html.dark .sd-nav-item.active svg {
+  color: #a78bfa;
+}
+
+/* ── Active tab indicators ───────────────────────────────────────────────── */
 html.dark .bg-teal-50.text-teal-700,
 html.dark [class*="bg-teal-50"][class*="text-teal-700"] {
-  background-color: rgba(20, 184, 166, 0.1) !important;
-  color: #2dd4bf !important;
+  background-color: rgba(20, 184, 166, 0.12) !important;
+  color: #5eead4 !important;
 }
+
 html.dark .bg-indigo-50.text-indigo-700 {
-  background-color: rgba(99, 102, 241, 0.1) !important;
-  color: #818cf8 !important;
+  background-color: rgba(99, 102, 241, 0.12) !important;
+  color: #a78bfa !important;
 }
 
-/* Dark mode: Scrollbar */
-html.dark .modern-scrollbar::-webkit-scrollbar-thumb { background: #475569; }
-html.dark .modern-scrollbar::-webkit-scrollbar-thumb:hover { background: #64748b; }
+/* ── Scrollbar — sleek & minimal ────────────────────────────────────────── */
+html.dark ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
 
-/* Dark mode: Bottom mobile nav */
+html.dark ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+html.dark ::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.15);
+  border-radius: 99px;
+}
+
+html.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.25);
+}
+
+/* ── Bottom mobile nav ───────────────────────────────────────────────────── */
 html.dark .fixed.bottom-0 {
-  background-color: #1e293b !important;
-  border-color: #334155 !important;
+  background-color: var(--bg-surface) !important;
+  border-color: var(--border-subtle) !important;
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.3);
 }
 
-/* Dark mode: Search bar */
+/* ── Search bar inside cards ─────────────────────────────────────────────── */
 html.dark .sd-card input,
 html.dark .sd-card select {
-  background-color: #0f172a !important;
-  border-color: #334155 !important;
+  background-color: var(--bg-input) !important;
+  border-color: var(--border-medium) !important;
 }
 
-/* Dark mode: Gradient text keep bright */
+/* ── Gradient text — vibrant on dark ─────────────────────────────────────── */
 html.dark .gradient-text {
-  @apply bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-violet-400;
+  @apply bg-clip-text text-transparent;
+  background-image: linear-gradient(135deg, #818cf8, #c084fc) !important;
 }
 
-/* Dark mode: Shadcn Card components used in Alumni Dashboard */
+/* ── Shadcn Card/Panel components ────────────────────────────────────────── */
 html.dark [class*="rounded-2xl"][class*="border"][class*="bg-white"] {
-  background-color: #1e293b !important;
-  border-color: #334155 !important;
+  background-color: var(--bg-card) !important;
+  border-color: var(--border-subtle) !important;
 }
 
-/* Dark mode: The settings page specific elements */
+/* ── Settings page cards ─────────────────────────────────────────────────── */
 html.dark .bg-white.rounded-2xl {
-  background-color: #1e293b !important;
+  background-color: var(--bg-card) !important;
+  border-color: var(--border-subtle) !important;
 }
 
-/* Dark mode - domain filter pills */
+/* ── Settings sidebar active tab ─────────────────────────────────────────── */
+html.dark button[class*="bg-indigo-50"][class*="text-indigo-700"] {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(139, 92, 246, 0.08)) !important;
+  color: #a78bfa !important;
+}
+
+/* ── Toggle switches in settings ─────────────────────────────────────────── */
+html.dark .bg-slate-200 {
+  background-color: #2a2c42 !important;
+}
+
+/* ── Select option buttons (active + inactive) ───────────────────────────── */
+html.dark button[class*="bg-indigo-50"][class*="text-indigo-600"] {
+  background: var(--glow-accent) !important;
+  border-color: rgba(139, 92, 246, 0.3) !important;
+  color: #a78bfa !important;
+}
+
+html.dark button[class*="bg-white"][class*="text-slate-500"] {
+  background: var(--bg-raised) !important;
+  border-color: var(--border-medium) !important;
+  color: var(--text-secondary) !important;
+}
+
+/* ── Danger zone card ────────────────────────────────────────────────────── */
+html.dark .border-rose-200 {
+  border-color: rgba(244, 63, 94, 0.2) !important;
+}
+
+html.dark .border-rose-100 {
+  border-color: rgba(244, 63, 94, 0.1) !important;
+}
+
+/* ── Domain filter pills ─────────────────────────────────────────────────── */
 html.dark button[class*="bg-\[#fafdff\]"] {
-  background-color: #1e293b !important;
-  border-color: #475569 !important;
-  color: #94a3b8 !important;
+  background-color: var(--bg-raised) !important;
+  border-color: var(--border-medium) !important;
+  color: var(--text-secondary) !important;
 }
 
-/* Dark mode transitions */
-body, .sd-card, .post-card, .premium-card, .workspace-card,
-input, textarea, select, nav, aside, main, header {
-  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+/* ── Tooltips & popovers ─────────────────────────────────────────────────── */
+html.dark [role="tooltip"],
+html.dark [data-state="open"][class*="bg-white"] {
+  background-color: var(--bg-raised) !important;
+  border-color: var(--border-subtle) !important;
+  color: var(--text-primary) !important;
+}
+
+/* ── Dropdown menus ──────────────────────────────────────────────────────── */
+html.dark [class*="shadow-2xl"][class*="bg-white"][class*="rounded-2xl"] {
+  background-color: var(--bg-card) !important;
+  border-color: var(--border-medium) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5),
+    0 0 0 1px var(--border-subtle) !important;
+}
+
+/* ── Badge adjustments ───────────────────────────────────────────────────── */
+html.dark .bg-indigo-50.text-indigo-600 {
+  background-color: rgba(99, 102, 241, 0.15) !important;
+  color: #a78bfa !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* Theme Transitions (smooth swap)                                            */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+body,
+.sd-card,
+.post-card,
+.premium-card,
+.workspace-card,
+input,
+textarea,
+select,
+nav,
+aside,
+main,
+header,
+button {
+  transition: background-color 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+    color 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }

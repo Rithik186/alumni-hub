@@ -75,8 +75,8 @@ const Login = () => {
                         className="mb-12"
                     >
                         <Link to="/" className="inline-flex items-center gap-2 text-white mb-8 group">
-                            <div className="w-10 h-10 bg-primary-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                                <GraduationCap className="text-white w-6 h-6" />
+                            <div className="w-12 h-12 bg-white border border-slate-700 rounded-xl flex items-center justify-center p-0.5 shadow-2xl group-hover:scale-110 transition-transform overflow-hidden">
+                                <img src="/logo.png" alt="Alumned In" className="w-full h-full object-contain scale-110" />
                             </div>
                             <span className="text-2xl font-bold tracking-tight">Alumned In</span>
                         </Link>

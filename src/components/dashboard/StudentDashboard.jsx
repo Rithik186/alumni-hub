@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -165,7 +165,7 @@ const CreatePostCard = ({ user }) => {
 };
 
 // ─── People Card ────────────────────────────────────────────────────────────────
-const PeopleCard = ({ person, followStatus, onFollow }) => (
+const PeopleCard = ({ person, followStatus, onFollow, onCancelFollow }) => (
     <SpotlightCard className="bg-transparent" spotlightColor="rgba(79, 70, 229, 0.1)">
     <div className="sd-card p-4 flex items-center gap-3">
         <Avatar src={person.profile_picture} name={person.name} size={44} />
@@ -175,16 +175,16 @@ const PeopleCard = ({ person, followStatus, onFollow }) => (
             {person.batch && <p className="text-[11px] text-indigo-500 font-medium mt-0.5">Batch of {person.batch}</p>}
         </div>
         <button
-            onClick={onFollow}
-            disabled={!!followStatus}
+            onClick={followStatus === 'pending' ? onCancelFollow : onFollow}
+            disabled={followStatus === 'accepted'}
             className={`px-3.5 py-1.5 text-xs font-semibold rounded-full transition-all flex items-center gap-1.5 flex-shrink-0 border ${
                 followStatus === 'accepted' ? 'bg-emerald-50 text-emerald-600 border-emerald-200 cursor-default' :
-                followStatus === 'pending'  ? 'bg-amber-50 text-amber-600 border-amber-200 cursor-default' :
+                followStatus === 'pending'  ? 'bg-amber-50 text-amber-600 border-amber-200 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 cursor-pointer' :
                 'bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700 shadow-sm'
             }`}
         >
             {followStatus === 'accepted' ? <><CheckCircle2 className="w-3 h-3" /> Connected</> :
-             followStatus === 'pending'  ? 'Pending' :
+             followStatus === 'pending'  ? <><X className="w-3 h-3" /> Pending</> :
              <><UserPlus className="w-3 h-3" /> Connect</>}
         </button>
     </div>
@@ -239,6 +239,13 @@ const StudentDashboard = () => {
     const [isResumeModalOpen, setIsResumeModalOpen] = useState(false);
     const [resumeAnalysis, setResumeAnalysis] = useState(null);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+    // Listen for mobile menu trigger
+    useEffect(() => {
+        const handler = () => setIsResumeModalOpen(true);
+        window.addEventListener('openResumeAnalyzer', handler);
+        return () => window.removeEventListener('openResumeAnalyzer', handler);
+    }, []);
 
     const [showCollegeSuggestions, setShowCollegeSuggestions] = useState(false);
     const collegeSuggestions = useMemo(() => {
@@ -363,6 +370,15 @@ const StudentDashboard = () => {
     // ── Mutations ────────────────────────────────────────────────────────────
     const followMutation = useMutation({
         mutationFn: (id) => axios.post(`/api/connections/follow/${id}`, {}, authHeader(user.token)),
+        onSuccess: () => {
+            queryClient.invalidateQueries(['myFollowStatuses']);
+            queryClient.invalidateQueries(['suggestions']);
+            queryClient.invalidateQueries(['socialStats']);
+        }
+    });
+
+    const unfollowMutation = useMutation({
+        mutationFn: (id) => axios.delete(`/api/connections/follow/${id}`, authHeader(user.token)),
         onSuccess: () => {
             queryClient.invalidateQueries(['myFollowStatuses']);
             queryClient.invalidateQueries(['suggestions']);
@@ -756,6 +772,7 @@ const StudentDashboard = () => {
                                             person={person}
                                             followStatus={followStatuses[person.id]}
                                             onFollow={() => !followStatuses[person.id] && followMutation.mutate(person.id)}
+                                            onCancelFollow={() => unfollowMutation.mutate(person.id)}
                                         />
                                     ))
                                 )}
@@ -1460,7 +1477,7 @@ const StudentDashboard = () => {
             {/* ─── RESUME ANALYZER MODAL ─────────────────────────────────── */}
             <AnimatePresence>
                 {isResumeModalOpen && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                    <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-0 sm:p-4">
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -1472,18 +1489,18 @@ const StudentDashboard = () => {
                             initial={{ opacity: 0, scale: 0.9, y: 20 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                            className="relative w-full max-w-2xl bg-white rounded-[32px] shadow-2xl overflow-hidden"
+                            className="relative w-full max-w-2xl bg-white rounded-t-[28px] sm:rounded-[32px] shadow-2xl overflow-hidden max-h-[95vh] sm:max-h-[90vh]"
                         >
                             {!resumeAnalysis ? (
-                                <div className="p-8">
-                                    <div className="flex items-center justify-between mb-8">
+                                <div className="p-5 sm:p-8">
+                                    <div className="flex items-center justify-between mb-6 sm:mb-8">
                                         <div className="flex items-center gap-3">
                                             <div className="w-12 h-12 rounded-2xl bg-indigo-600 flex items-center justify-center">
                                                 <Sparkles className="w-6 h-6 text-white" />
                                             </div>
                                             <div>
-                                                <h2 className="text-xl font-bold text-slate-900">Resume Intelligence</h2>
-                                                <p className="text-sm text-slate-500 font-medium">AI-powered ATS & Skill Gap Analysis</p>
+                                                <h2 className="text-base sm:text-xl font-bold text-slate-900">Resume Intelligence</h2>
+                                                <p className="text-xs sm:text-sm text-slate-500 font-medium">AI-powered ATS & Skill Gap Analysis</p>
                                             </div>
                                         </div>
                                         <button 
@@ -1512,7 +1529,7 @@ const StudentDashboard = () => {
                                         </div>
                                     ) : (
                                         <div className="space-y-6">
-                                            <div className="border-2 border-dashed border-slate-200 rounded-[24px] p-10 flex flex-col items-center group hover:border-indigo-300 hover:bg-indigo-50/30 transition-all">
+                                            <div className="border-2 border-dashed border-slate-200 rounded-[24px] p-6 sm:p-10 flex flex-col items-center group hover:border-indigo-300 hover:bg-indigo-50/30 transition-all">
                                                 <div className="w-16 h-16 rounded-2xl bg-slate-50 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                                                     <Briefcase className="w-8 h-8 text-slate-400 group-hover:text-indigo-600" />
                                                 </div>
@@ -1549,16 +1566,16 @@ const StudentDashboard = () => {
                                                 </label>
                                             </div>
 
-                                            <div className="grid grid-cols-3 gap-4">
+                                            <div className="grid grid-cols-3 gap-2 sm:gap-4">
                                                 {[
                                                     { icon: CheckCircle2, label: '98% Accuracy', desc: 'ATS Prediction' },
                                                     { icon: Zap, label: 'Skill Gaps', desc: 'Market Matching' },
                                                     { icon: TrendingUp, label: 'Optimized', desc: 'Job Referral' }
                                                 ].map((item, idx) => (
-                                                    <div key={idx} className="p-4 rounded-2xl bg-slate-50 border border-slate-100">
-                                                        <item.icon className="w-5 h-5 text-indigo-500 mb-2" />
-                                                        <p className="text-[11px] font-bold text-slate-900">{item.label}</p>
-                                                        <p className="text-[10px] text-slate-500 font-medium">{item.desc}</p>
+                                                    <div key={idx} className="p-3 sm:p-4 rounded-2xl bg-slate-50 border border-slate-100">
+                                                        <item.icon className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-500 mb-1.5 sm:mb-2" />
+                                                        <p className="text-[10px] sm:text-[11px] font-bold text-slate-900">{item.label}</p>
+                                                        <p className="text-[9px] sm:text-[10px] text-slate-500 font-medium">{item.desc}</p>
                                                     </div>
                                                 ))}
                                             </div>
@@ -1566,8 +1583,8 @@ const StudentDashboard = () => {
                                     )}
                                 </div>
                             ) : (
-                                <div className="max-h-[85vh] overflow-y-auto">
-                                    <div className="sticky top-0 bg-white/80 backdrop-blur-md px-8 py-5 border-b border-slate-100 flex items-center justify-between z-10">
+                                <div className="max-h-[90vh] sm:max-h-[85vh] overflow-y-auto">
+                                    <div className="sticky top-0 bg-white/80 backdrop-blur-md px-4 sm:px-8 py-4 sm:py-5 border-b border-slate-100 flex items-center justify-between z-10">
                                         <div className="flex items-center gap-3">
                                             <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center">
                                                 <Sparkles className="w-5 h-5 text-white" />
@@ -1582,25 +1599,25 @@ const StudentDashboard = () => {
                                         </button>
                                     </div>
 
-                                    <div className="p-8 space-y-8">
+                                    <div className="p-4 sm:p-8 space-y-6 sm:space-y-8">
                                         {/* Score Section */}
-                                        <div className="flex items-center gap-8 bg-indigo-600 rounded-[28px] p-8 text-white relative overflow-hidden">
+                                        <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-8 bg-indigo-600 rounded-[20px] sm:rounded-[28px] p-5 sm:p-8 text-white relative overflow-hidden">
                                             <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-32 -mt-32 blur-3xl" />
                                             <div className="relative flex flex-col items-center">
-                                                <div className="w-28 h-28 rounded-full border-[10px] border-white/20 flex items-center justify-center mb-2">
-                                                    <span className="text-4xl font-black">{resumeAnalysis.ats_score}</span>
+                                                <div className="w-20 h-20 sm:w-28 sm:h-28 rounded-full border-[8px] sm:border-[10px] border-white/20 flex items-center justify-center mb-1 sm:mb-2">
+                                                    <span className="text-3xl sm:text-4xl font-black">{resumeAnalysis.ats_score}</span>
                                                 </div>
                                                 <p className="text-[10px] font-black uppercase tracking-widest text-indigo-200">ATS SCORE</p>
                                             </div>
                                             <div className="relative flex-1">
-                                                <h3 className="text-xl font-bold mb-2">Great start, {user.name?.split(' ')[0]}!</h3>
-                                                <p className="text-sm text-indigo-100 font-medium leading-relaxed">
+                                                <h3 className="text-base sm:text-xl font-bold mb-1 sm:mb-2 text-center sm:text-left">Great start, {user.name?.split(' ')[0]}!</h3>
+                                                <p className="text-xs sm:text-sm text-indigo-100 font-medium leading-relaxed text-center sm:text-left">
                                                     {resumeAnalysis.summary}
                                                 </p>
                                             </div>
                                         </div>
 
-                                        <div className="grid grid-cols-2 gap-6">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                                             {/* Skills Matched */}
                                             <div className="space-y-4">
                                                 <div className="flex items-center gap-2">
@@ -1669,7 +1686,7 @@ const StudentDashboard = () => {
                                             <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
                                                 <Building2 className="w-4 h-4" /> Company Compatibility
                                             </h4>
-                                            <div className="grid grid-cols-2 gap-4">
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                                                 {resumeAnalysis.top_company_matches?.map((c, i) => (
                                                     <div key={i} className="p-4 rounded-2xl border border-slate-100 bg-slate-50 flex items-center justify-between group hover:bg-white hover:shadow-xl hover:shadow-indigo-50 transition-all cursor-pointer">
                                                         <div>
@@ -1686,7 +1703,7 @@ const StudentDashboard = () => {
                                         </div>
                                     </div>
 
-                                    <div className="p-8 pt-0">
+                                    <div className="p-4 sm:p-8 pt-0">
                                         <button 
                                             onClick={() => setIsResumeModalOpen(false)}
                                             className="w-full py-4 bg-slate-900 text-white rounded-2xl text-xs font-bold shadow-xl hover:bg-slate-800 transition-all active:scale-95"

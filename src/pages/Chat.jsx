@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
     Send, Image as ImageIcon, FileText, Paperclip, 
     Check, CheckCheck, User, Circle, ArrowLeft, 
     Search, X, Smile, MoreVertical, Download, 
     Edit, Trash2, Info, Phone, Video, Loader2, MessageSquare,
-    Mic, Square, Play, Pause
+    Mic, Square, Play, Pause, Clock
 } from 'lucide-react';
 import EmojiPicker from 'emoji-picker-react';
 import { useUser } from '../context/UserContext';
@@ -188,6 +189,8 @@ const Chat = () => {
     const emojiPickerRef = useRef(null);
 
     const voiceRecorder = useVoiceRecorder();
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [isCallHistoryOpen, setIsCallHistoryOpen] = useState(false);
 
     // Date grouping utility
     const groupMessagesByDate = (messages) => {
@@ -309,8 +312,12 @@ const Chat = () => {
                 });
             });
 
-            socket.on('call-ended', () => {
+            socket.on('call-ended', (data) => {
                 setActiveCall(null);
+                if (data && data.duration > 0) {
+                    // Call was active, it will be logged by the person who clicked end call 
+                    // or both if we want to be sure. 
+                }
             });
         }
 
@@ -539,6 +546,30 @@ const Chat = () => {
         status: onlineUsers.includes(c.id.toString()) ? 'online' : 'offline'
     }));
 
+    const handleEndCall = (callData) => {
+        setActiveCall(null);
+        if (callData && callData.duration > 0) {
+            const minutes = Math.floor(callData.duration / 60);
+            const seconds = callData.duration % 60;
+            const durationStr = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+            
+            // Log call history as a system message
+            sendMessageMutation.mutate({
+                receiverId: selectedContact.id,
+                text: `__CALL_LOG__:{"duration":"${durationStr}","type":"${activeCall.type}","timestamp":"${callData.timestamp}"}`,
+            });
+        }
+    };
+
+    const isCallLog = (text) => text && text.startsWith('__CALL_LOG__:');
+    const parseCallLog = (text) => {
+        try {
+            return JSON.parse(text.replace('__CALL_LOG__:', ''));
+        } catch (e) {
+            return null;
+        }
+    };
+
     const selectedContactOnline = selectedContact ? onlineUsers.includes(selectedContact.id.toString()) : false;
 
     return (
@@ -672,40 +703,63 @@ const Chat = () => {
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-1 md:gap-2">
-                                    <div className="hidden sm:flex items-center gap-1">
-                                        <TooltipProvider>
-                                            <Tooltip>
-                                                <TooltipTrigger asChild>
-                                                    <Button 
-                                                        variant="ghost" 
-                                                        size="icon" 
-                                                        className="rounded-xl text-slate-400 hover:text-indigo-600 hover:bg-indigo-50"
-                                                        onClick={() => setActiveCall({ type: 'voice', contact: selectedContact })}
-                                                    >
-                                                        <Phone className="w-4 h-4 md:w-5 md:h-5" />
-                                                    </Button>
-                                                </TooltipTrigger>
-                                                <TooltipContent className="bg-slate-900 text-white font-bold text-[10px]">Start Voice Call</TooltipContent>
-                                            </Tooltip>
-                                            <Tooltip>
-                                                <TooltipTrigger asChild>
-                                                    <Button 
-                                                        variant="ghost" 
-                                                        size="icon" 
-                                                        className="rounded-xl text-slate-400 hover:text-indigo-600 hover:bg-indigo-50"
-                                                        onClick={() => setActiveCall({ type: 'video', contact: selectedContact })}
-                                                    >
-                                                        <Video className="w-4 h-4 md:w-5 md:h-5" />
-                                                    </Button>
-                                                </TooltipTrigger>
-                                                <TooltipContent className="bg-slate-900 text-white font-bold text-[10px]">Start Video Session</TooltipContent>
-                                            </Tooltip>
-                                        </TooltipProvider>
-                                        <Separator orientation="vertical" className="h-6 mx-2" />
-                                    </div>
-                                    <Button variant="ghost" size="icon" className="rounded-xl text-slate-400 hover:text-slate-900">
-                                        <MoreVertical className="w-4 h-4 md:w-5 md:h-5" />
+                                    <Button 
+                                        variant="ghost" 
+                                        size="icon" 
+                                        className="rounded-xl text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 h-8 w-8 md:h-9 md:w-9"
+                                        onClick={() => setActiveCall({ type: 'voice', contact: selectedContact })}
+                                        title="Voice Call"
+                                    >
+                                        <Phone className="w-4 h-4" />
                                     </Button>
+                                    <Button 
+                                        variant="ghost" 
+                                        size="icon" 
+                                        className="rounded-xl text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 h-8 w-8 md:h-9 md:w-9"
+                                        onClick={() => setActiveCall({ type: 'video', contact: selectedContact })}
+                                        title="Video Call"
+                                    >
+                                        <Video className="w-4 h-4" />
+                                    </Button>
+                                    <Separator orientation="vertical" className="h-5 md:h-6 mx-0.5 md:mx-2 hidden sm:block" />
+                                    <div className="relative">
+                                        <Button 
+                                            variant="ghost" 
+                                            size="icon" 
+                                            className="rounded-xl text-slate-400 hover:text-slate-900"
+                                            onClick={() => setIsMenuOpen(!isMenuOpen)}
+                                        >
+                                            <MoreVertical className="w-4 h-4 md:w-5 md:h-5" />
+                                        </Button>
+                                        
+                                        <AnimatePresence>
+                                            {isMenuOpen && (
+                                                <motion.div 
+                                                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                                                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                                                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                                                    className="absolute right-0 top-full mt-2 w-48 bg-white rounded-2xl shadow-2xl border border-slate-100 py-2 z-[60] overflow-hidden"
+                                                >
+                                                    <button 
+                                                        onClick={() => { setIsCallHistoryOpen(true); setIsMenuOpen(false); }}
+                                                        className="w-full text-left px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50 flex items-center gap-3 transition-colors"
+                                                    >
+                                                        <Phone className="w-4 h-4 text-indigo-500" />
+                                                        See Call History
+                                                    </button>
+                                                    <button className="w-full text-left px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50 flex items-center gap-3 transition-colors">
+                                                        <Info className="w-4 h-4 text-slate-400" />
+                                                        Contact Info
+                                                    </button>
+                                                    <div className="h-[1px] bg-slate-100 my-1 mx-2" />
+                                                    <button className="w-full text-left px-4 py-2.5 text-xs font-bold text-rose-500 hover:bg-rose-50 flex items-center gap-3 transition-colors">
+                                                        <Trash2 className="w-4 h-4" />
+                                                        Block User
+                                                    </button>
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
+                                    </div>
                                 </div>
                             </div>
                         </FadeContent>
@@ -732,6 +786,22 @@ const Chat = () => {
                                         </div>
                                         {dateMessages.map((msg, i) => {
                                             const isMe = msg.senderId === user.id;
+                                            const callLog = isCallLog(msg.text) ? parseCallLog(msg.text) : null;
+                                            
+                                            if (callLog) {
+                                                return (
+                                                    <div key={msg.id} className="flex justify-center my-4">
+                                                        <div className="bg-indigo-50/50 backdrop-blur-sm border border-indigo-100/50 rounded-2xl px-6 py-2.5 flex items-center gap-3">
+                                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${callLog.type === 'video' ? 'bg-purple-100 text-purple-600' : 'bg-indigo-100 text-indigo-600'}`}>
+                                                                {callLog.type === 'video' ? <Video className="w-4 h-4" /> : <Phone className="w-4 h-4" />}
+                                                            </div>
+                                                            <p className="text-[11px] font-bold text-indigo-900/70 uppercase tracking-tight">
+                                                                {callLog.type === 'video' ? 'Video' : 'Voice'} Call • {callLog.duration}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            }
                                             return (
                                                 <FadeContent key={msg.id} blur duration={400} delay={i % 5 * 50}>
                                                     <div className={`flex group ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
@@ -1062,6 +1132,79 @@ const Chat = () => {
                 )}
             </div>
 
+            {/* Call History Drawer - rendered via Portal to escape overflow:hidden */}
+            {createPortal(
+                <AnimatePresence>
+                    {isCallHistoryOpen && (
+                        <>
+                            <motion.div 
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                onClick={() => setIsCallHistoryOpen(false)}
+                                className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[9998]"
+                            />
+                            <motion.div 
+                                initial={{ x: '100%' }}
+                                animate={{ x: 0 }}
+                                exit={{ x: '100%' }}
+                                transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                                className="fixed right-0 top-0 h-full w-full sm:w-[400px] bg-white shadow-2xl z-[9999] flex flex-col"
+                            >
+                                <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                                    <div>
+                                        <h2 className="text-xl font-bold text-slate-900">Call History</h2>
+                                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">With {selectedContact?.name}</p>
+                                    </div>
+                                    <Button variant="ghost" size="icon" onClick={() => setIsCallHistoryOpen(false)} className="rounded-xl hover:bg-slate-100">
+                                        <X className="w-5 h-5 text-slate-400" />
+                                    </Button>
+                                </div>
+                                
+                                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                                    {messages.filter(m => isCallLog(m.text)).length > 0 ? (
+                                        messages.filter(m => isCallLog(m.text)).slice().reverse().map(msg => {
+                                            const log = parseCallLog(msg.text);
+                                            return (
+                                                <div key={msg.id} className="p-4 rounded-3xl bg-slate-50 border border-slate-100 hover:border-indigo-100 transition-colors">
+                                                    <div className="flex items-center gap-4 mb-3">
+                                                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${log.type === 'video' ? 'bg-purple-100 text-purple-600' : 'bg-indigo-100 text-indigo-600'}`}>
+                                                            {log.type === 'video' ? <Video className="w-6 h-6" /> : <Phone className="w-6 h-6" />}
+                                                        </div>
+                                                        <div>
+                                                            <h4 className="font-bold text-slate-900 leading-tight">{log.type === 'video' ? 'Video Session' : 'Voice Call'}</h4>
+                                                            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{log.duration}</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center justify-between pt-3 border-t border-slate-200/50">
+                                                        <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400">
+                                                            <Clock className="w-3 h-3" />
+                                                            {new Date(msg.timestamp).toLocaleDateString()} at {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                        </div>
+                                                        <div className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-600 uppercase tracking-tight">Completed</div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })
+                                    ) : (
+                                        <div className="h-full flex flex-col items-center justify-center gap-4 text-center px-10">
+                                            <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center">
+                                                <Phone className="w-8 h-8 text-slate-300" />
+                                            </div>
+                                            <div>
+                                                <p className="font-bold text-slate-900">No calls yet</p>
+                                                <p className="text-xs font-bold text-slate-400">All your voice and video sessions will appear here.</p>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </motion.div>
+                        </>
+                    )}
+                </AnimatePresence>,
+                document.body
+            )}
+
             {/* Media Call Interface Overlay */}
             <AnimatePresence>
                 {activeCall && (
@@ -1069,23 +1212,13 @@ const Chat = () => {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
+                        className="z-[200]"
                     >
                         <MediaCall 
                             user={user} 
                             selectedContact={activeCall.contact} 
                             incomingCallData={activeCall.incomingData}
-                            onEndCall={(callDetails) => {
-                                setActiveCall(null);
-                                if (callDetails && callDetails.duration > 0 && selectedContact) {
-                                    const minutes = Math.floor(callDetails.duration / 60);
-                                    const seconds = callDetails.duration % 60;
-                                    const durationStr = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
-                                    
-                                    sendMessageMutation.mutate({
-                                        text: `📞 Video Call ended - Duration: ${durationStr}`,
-                                    });
-                                }
-                            }} 
+                            onEndCall={handleEndCall} 
                         />
                     </motion.div>
                 )}

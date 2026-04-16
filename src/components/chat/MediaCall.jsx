@@ -18,6 +18,7 @@ const STUN_SERVERS = {
 };
 
 const MediaCall = ({ user, selectedContact, incomingCallData, onEndCall }) => {
+    const [isSwapped, setIsSwapped] = useState(false);
     const [stream, setStream] = useState(null);
     const [receivingCall, setReceivingCall] = useState(!!incomingCallData);
     const [caller, setCaller] = useState(incomingCallData?.from || "");
@@ -269,56 +270,82 @@ const MediaCall = ({ user, selectedContact, incomingCallData, onEndCall }) => {
 
                 {/* Video Area */}
                 <div className="flex-1 relative flex items-center justify-center bg-slate-950">
-                    {/* User Video (Large Fullscreen-ish) */}
-                    {callAccepted && !callEnded ? (
-                        <video playsInline ref={userVideo} autoPlay className="absolute inset-0 w-full h-full object-cover z-0" />
-                    ) : (
-                        <div className="flex flex-col items-center gap-6 z-10 mt-12">
-                            <motion.div 
-                                animate={{ scale: [1, 1.1, 1] }} 
-                                transition={{ repeat: Infinity, duration: 2 }}
-                                className="w-32 h-32 rounded-full bg-slate-800 flex items-center justify-center border-4 border-slate-700 shadow-2xl"
-                            >
-                                <Avatar className="h-28 w-28">
-                                    <AvatarImage src={selectedContact?.avatar} />
-                                    <AvatarFallback className="bg-transparent text-slate-400">
-                                        <User className="w-16 h-16" />
-                                    </AvatarFallback>
-                                </Avatar>
-                            </motion.div>
-                            <div className="text-center px-6">
-                                <h2 className="text-2xl font-bold text-white mb-2">{selectedContact?.name || name}</h2>
-                                {receivingCall && !callAccepted ? (
-                                    <p className="text-emerald-400 animate-pulse font-bold tracking-widest uppercase mb-4">Incoming Call...</p>
-                                ) : (
-                                    <>
-                                        <p className="text-slate-400 font-medium mb-8">
-                                            {isCalling ? 'Waiting for answer...' : 'End-to-end encrypted call'}
-                                        </p>
-                                        {!isCalling && !receivingCall && !callAccepted && (
-                                            <Button 
-                                                onClick={() => callUser(selectedContact?.id)}
-                                                className="bg-emerald-600 hover:bg-emerald-700 text-white px-10 py-6 rounded-full font-bold text-lg shadow-[0_0_20px_rgba(16,185,129,0.4)] transition-transform hover:scale-105 active:scale-95"
-                                            >
-                                                Start Call
-                                            </Button>
-                                        )}
-                                    </>
-                                )}
+                    {/* Primary Video Container (Large Background) */}
+                    <div className="absolute inset-0 w-full h-full overflow-hidden">
+                        {callAccepted && !callEnded ? (
+                            <video 
+                                playsInline 
+                                ref={isSwapped ? myVideo : userVideo} 
+                                autoPlay 
+                                className={`w-full h-full object-cover transition-all duration-500 ${isSwapped ? 'mirror' : ''}`} 
+                            />
+                        ) : (
+                            <div className="flex flex-col items-center justify-center h-full gap-6 mt-12">
+                                <motion.div 
+                                    animate={{ scale: [1, 1.1, 1] }} 
+                                    transition={{ repeat: Infinity, duration: 2 }}
+                                    className="w-32 h-32 rounded-full bg-slate-800 flex items-center justify-center border-4 border-slate-700 shadow-2xl"
+                                >
+                                    <Avatar className="h-28 w-28">
+                                        <AvatarImage src={selectedContact?.avatar} />
+                                        <AvatarFallback className="bg-transparent text-slate-400">
+                                            <User className="w-16 h-16" />
+                                        </AvatarFallback>
+                                    </Avatar>
+                                </motion.div>
+                                <div className="text-center px-6">
+                                    <h2 className="text-2xl font-bold text-white mb-2">{selectedContact?.name || name}</h2>
+                                    {receivingCall && !callAccepted ? (
+                                        <p className="text-emerald-400 animate-pulse font-bold tracking-widest uppercase mb-4">Incoming Call...</p>
+                                    ) : (
+                                        <>
+                                            <p className="text-slate-400 font-medium mb-8">
+                                                {isCalling ? 'Waiting for answer...' : 'End-to-end encrypted call'}
+                                            </p>
+                                            {!isCalling && !receivingCall && !callAccepted && (
+                                                <Button 
+                                                    onClick={() => callUser(selectedContact?.id)}
+                                                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-10 py-6 rounded-full font-bold text-lg shadow-[0_0_20px_rgba(16,185,129,0.4)] transition-transform hover:scale-105 active:scale-95"
+                                                >
+                                                    Start Call
+                                                </Button>
+                                            )}
+                                        </>
+                                    )}
+                                </div>
                             </div>
-                        </div>
-                    )}
+                        )}
+                    </div>
 
-                    {/* My Video (Small Overlay PIP) */}
+                    {/* Secondary Video Container (Small Overlay PIP) */}
                     {stream && (
-                        <div className="absolute top-24 right-6 w-28 h-40 md:w-40 md:h-56 bg-slate-800 rounded-2xl overflow-hidden shadow-2xl border-2 border-white/20 z-20">
-                            <video playsInline muted ref={myVideo} autoPlay className="w-full h-full object-cover mirror" />
-                            {!isVideoEnabled && (
+                        <motion.div 
+                            initial={{ opacity: 0, scale: 0.8 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            whileHover={{ scale: 1.05 }}
+                            onClick={() => setIsSwapped(!isSwapped)}
+                            className="absolute top-24 right-6 w-28 h-40 md:w-40 md:h-56 bg-slate-800 rounded-2xl overflow-hidden shadow-2xl border-2 border-white/20 z-20 cursor-pointer group"
+                        >
+                            <video 
+                                playsInline 
+                                muted={!isSwapped} 
+                                ref={isSwapped ? userVideo : myVideo} 
+                                autoPlay 
+                                className={`w-full h-full object-cover ${!isSwapped ? 'mirror' : ''}`} 
+                            />
+                            
+                            {/* Overlay Indicators */}
+                            <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                <Maximize2 className="w-8 h-8 text-white/70" />
+                            </div>
+
+                            {/* Camera Off Placeholder */}
+                            {((!isSwapped && !isVideoEnabled) || (isSwapped && false)) && (
                                 <div className="absolute inset-0 bg-slate-900 flex items-center justify-center">
                                     <VideoOff className="w-8 h-8 text-slate-600" />
                                 </div>
                             )}
-                        </div>
+                        </motion.div>
                     )}
                 </div>
 

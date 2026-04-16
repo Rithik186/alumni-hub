@@ -5,7 +5,7 @@ import {
     MapPin, UserPlus, Search, Filter,
     LayoutGrid, List, Sparkles, ChevronRight,
     CheckCircle2, Loader2, MessageSquare, UserCheck,
-    School, GraduationCap, RefreshCw
+    School, GraduationCap, RefreshCw, X
 } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import Navbar from '../components/landing/Navbar';
@@ -80,6 +80,24 @@ const CompanyAlumni = () => {
     };
 
     const handleFollow = async (userId) => {
+        const currentStatus = followStatus[userId];
+        
+        if (currentStatus === 'pending') {
+            // Cancel the pending request
+            setFollowStatus(prev => ({ ...prev, [userId]: 'none' }));
+            try {
+                await fetch(`/api/connections/follow/${userId}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${currentUser.token}` }
+                });
+                toast.success('Request cancelled');
+            } catch (err) {
+                setFollowStatus(prev => ({ ...prev, [userId]: 'pending' }));
+                toast.error('Failed to cancel request');
+            }
+            return;
+        }
+
         setFollowStatus(prev => ({ ...prev, [userId]: 'pending' }));
         try {
             const res = await fetch(`/api/connections/follow/${userId}`, {
@@ -339,15 +357,15 @@ const CompanyAlumni = () => {
                                     <div className="flex items-center gap-2 pt-4 border-t border-slate-100/60">
                                         <button 
                                             onClick={() => handleFollow(person.id)}
-                                            disabled={followStatus[person.id] === 'pending' || followStatus[person.id] === 'accepted'}
+                                            disabled={followStatus[person.id] === 'accepted'}
                                             className={`flex-1 h-10 rounded-xl text-[10px] font-black transition-all flex items-center justify-center gap-1.5 ${
                                                 followStatus[person.id] === 'accepted' ? 'bg-emerald-50 text-emerald-600' :
-                                                followStatus[person.id] === 'pending' ? 'bg-amber-50 text-amber-600' :
+                                                followStatus[person.id] === 'pending' ? 'bg-amber-50 text-amber-600 hover:bg-rose-50 hover:text-rose-600 cursor-pointer' :
                                                 'bg-slate-900 text-white hover:bg-slate-800'
                                             }`}
                                         >
                                             {followStatus[person.id] === 'accepted' ? <><UserCheck className="w-3.5 h-3.5" /> Connected</> :
-                                             followStatus[person.id] === 'pending' ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Pending</> :
+                                             followStatus[person.id] === 'pending' ? <><X className="w-3.5 h-3.5" /> Cancel Request</> :
                                              <><UserPlus className="w-3.5 h-3.5" /> Connect</>}
                                         </button>
                                         <button 
