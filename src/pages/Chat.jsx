@@ -174,10 +174,11 @@ const Chat = () => {
     const { user } = useUser();
     const queryClient = useQueryClient();
     const [newMessage, setNewMessage] = useState("");
-    const [attachment, setAttachment] = useState({ image_url: '', video_url: '' });
+    const [attachment, setAttachment] = useState({ image_url: '', video_url: '', preview_url: '' });
     const [selectedContact, setSelectedContact] = useState(null);
     const [search, setSearch] = useState("");
     const [isUploading, setIsUploading] = useState(false);
+
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const [viewImage, setViewImage] = useState(null);
     const [editingMessage, setEditingMessage] = useState(null);
@@ -414,8 +415,9 @@ const Chat = () => {
         if (!file) return;
 
         const localUrl = URL.createObjectURL(file);
-        if (type === 'image') setAttachment(prev => ({ ...prev, image_url: localUrl, video_url: '', file }));
-        else setAttachment(prev => ({ ...prev, video_url: localUrl, image_url: '', file }));
+        // Set PREVIEW URL for UI, but keep image_url empty until upload finishes
+        if (type === 'image') setAttachment(prev => ({ ...prev, preview_url: localUrl, image_url: '', video_url: '' }));
+        else setAttachment(prev => ({ ...prev, preview_url: localUrl, video_url: '', image_url: '' }));
 
         setIsUploading(true);
         try {
@@ -424,19 +426,28 @@ const Chat = () => {
             const { data } = await axios.post('/api/upload/media', formData, {
                 headers: { 'Authorization': `Bearer ${user.token}` }
             });
+
+
             
+            // Set the REAL Cloudinary URL
             setAttachment(prev => {
                 const updated = { ...prev };
-                if (type === 'image') updated.image_url = data.url;
-                else updated.video_url = data.url;
+                if (type === 'image') {
+                    updated.image_url = data.url;
+                } else {
+                    updated.video_url = data.url;
+                }
                 return updated;
             });
         } catch (err) {
             console.error('Upload Error:', err);
+            toast.error('Failed to upload file');
+            setAttachment({ image_url: '', video_url: '', preview_url: '' });
         } finally {
             setIsUploading(false);
         }
     };
+
 
     const handleSendVoice = async () => {
         if (!voiceRecorder.audioBlob || !selectedContact) return;
@@ -464,14 +475,22 @@ const Chat = () => {
     };
 
     const handleSend = async () => {
-        if ((!newMessage.trim() && !attachment.image_url && !attachment.video_url) || !selectedContact) return;
-        if (isUploading) return;
+        if (!selectedContact) return;
+        if (isUploading) return toast.error('Wait for upload to finish');
 
-        const msgText = newMessage;
-        const msgAttachment = { ...attachment };
+        const msgText = newMessage.trim();
+        const msgImage = attachment.image_url;
+        const msgVideo = attachment.video_url;
+
+        // Final Safety Check: Never send a blob URL to the database
+        if (msgImage?.startsWith('blob:') || msgVideo?.startsWith('blob:')) {
+            return toast.error('Upload still in progress...');
+        }
+
+        if (!msgText && !msgImage && !msgVideo) return;
 
         setNewMessage('');
-        setAttachment({ image_url: '', video_url: '' });
+        setAttachment({ image_url: '', video_url: '', preview_url: '' });
         setShowEmojiPicker(false);
 
         if (editingMessage) {
@@ -480,11 +499,12 @@ const Chat = () => {
             sendMessageMutation.mutate({
                 receiverId: selectedContact.id,
                 text: msgText,
-                image_url: msgAttachment.image_url,
-                video_url: msgAttachment.video_url
+                image_url: msgImage,
+                video_url: msgVideo
             });
         }
     };
+
 
     const handleDownload = async (url, filename) => {
         const response = await fetch(url);
@@ -786,7 +806,7 @@ const Chat = () => {
                         <div className="px-4 md:px-8 py-4 bg-white border-t border-slate-100 w-full relative z-30">
                             {/* Attachment Preview Overlay */}
                             <AnimatePresence>
-                                {(attachment.image_url || attachment.video_url) && (
+                                {attachment.preview_url && (
                                     <motion.div 
                                         initial={{ opacity: 0, y: 10, scale: 0.95 }}
                                         animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -794,35 +814,20 @@ const Chat = () => {
                                         className="absolute bottom-[100%] left-4 right-4 md:left-8 md:right-8 mb-4 bg-white p-3 border border-slate-200 rounded-2xl shadow-2xl z-[50]"
                                     >
                                         <div className="flex items-center justify-between mb-3 px-1">
-                                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Media Preview</span>
-                                            <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-rose-50 hover:text-rose-500 rounded-full" onClick={() => setAttachment({ image_url: '', video_url: '' })}>
+                                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                                {isUploading ? 'Uploading to Server...' : 'Media Preview'}
+                                            </span>
+                                            <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-rose-50 hover:text-rose-500 rounded-full" onClick={() => setAttachment({ image_url: '', video_url: '', preview_url: '' })}>
                                                 <X className="w-4 h-4" />
                                             </Button>
                                         </div>
-
-                                        <div className="flex flex-col items-center bg-slate-50 rounded-xl overflow-hidden mb-3">
-                                            <div className="w-full max-h-[200px] flex items-center justify-center">
-                                                {attachment.image_url && <img src={attachment.image_url} alt="Preview" className="max-h-[200px] w-auto object-contain" />}
-                                                {attachment.video_url && <video src={attachment.video_url} controls className="max-h-[200px] w-auto" />}
-                                            </div>
-                                        </div>
-
-                                        <div className="flex items-center gap-2 bg-slate-100/50 p-2 rounded-xl border border-slate-200/50 focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
-                                            <input
-                                                type="text"
-                                                value={newMessage}
-                                                onChange={(e) => setNewMessage(e.target.value)}
-                                                onKeyDown={(e) => e.key === 'Enter' && !isUploading && handleSend()}
-                                                placeholder="Add a caption..."
-                                                className="flex-1 bg-transparent px-2 text-sm font-medium outline-none text-slate-700 placeholder:text-slate-400"
-                                            />
-                                            <Button
-                                                onClick={handleSend}
-                                                disabled={isUploading || sendMessageMutation.isPending}
-                                                className="h-11 w-11 !p-0 rounded-full bg-indigo-600 text-white shadow-lg hover:bg-indigo-700 transition-all flex items-center justify-center active:scale-90"
-                                            >
-                                                {isUploading || sendMessageMutation.isPending ? <Loader2 className="w-7 h-7 animate-spin" /> : <Send className="w-7 h-7" />}
-                                            </Button>
+                                        <div className="relative rounded-xl overflow-hidden bg-slate-50 border border-slate-100 max-h-[180px] flex justify-center">
+                                            {attachment.preview_url && <img src={attachment.preview_url} alt="To send" className={`max-h-[180px] object-contain transition-opacity ${isUploading ? 'opacity-40' : 'opacity-100'}`} />}
+                                            {isUploading && (
+                                                <div className="absolute inset-0 flex items-center justify-center">
+                                                    <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+                                                </div>
+                                            )}
                                         </div>
                                     </motion.div>
                                 )}
@@ -931,7 +936,7 @@ const Chat = () => {
                                     />
 
                                     {/* Voice record button (only show when input is empty) */}
-                                    {!newMessage.trim() && !editingMessage ? (
+                                    {!newMessage.trim() && !editingMessage && !attachment.preview_url ? (
                                         <TooltipProvider>
                                             <Tooltip>
                                                 <TooltipTrigger asChild>
@@ -992,6 +997,7 @@ const Chat = () => {
                                 </div>
                             )}
                         </div>
+
 
                         {/* Lightbox Modal */}
                         <AnimatePresence>

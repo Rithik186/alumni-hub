@@ -1,4 +1,8 @@
 import db from '../config/db.js';
+import cloudinary from '../config/cloudinary.js';
+import { deleteMediaFromCloudinary } from '../utils/cloudinaryHelper.js';
+
+
 
 // Enhanced Alumni Search with "LinkedIn-style" granularity
 export const searchAlumni = async (req, res) => {
@@ -108,18 +112,35 @@ export const uploadResume = async (req, res) => {
             return res.status(400).json({ message: 'No file uploaded' });
         }
 
-        const base64String = req.file.buffer.toString('base64');
-        const resume_url = `data:${req.file.mimetype};base64,${base64String}`;
+        // 1. Get old resume URL
+        const oldRes = await db.query('SELECT resume_url FROM student_profiles WHERE user_id = $1', [req.user.id]);
+        const oldResumeUrl = oldRes.rows[0]?.resume_url;
 
+        // 2. Upload new resume to Cloudinary
+        const fileBase64 = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
+        const result = await cloudinary.uploader.upload(fileBase64, {
+            folder: 'alumni_platform/resumes',
+            resource_type: 'auto'
+        });
+        
+        const resume_url = result.secure_url;
+
+        // 3. Update DB
         await db.query(
             'UPDATE student_profiles SET resume_url = $1 WHERE user_id = $2',
             [resume_url, req.user.id]
         );
 
+        // 4. Cleanup old resume from Cloudinary
+        if (oldResumeUrl) {
+            deleteMediaFromCloudinary(oldResumeUrl);
+        }
+
         res.json({
             message: 'Resume uploaded successfully',
             resume_url
         });
+
 
     } catch (error) {
         console.error('Resume Upload Error:', error);
@@ -129,6 +150,7 @@ export const uploadResume = async (req, res) => {
         });
     }
 };
+
 
 // Update student profile
 export const updateProfile = async (req, res) => {

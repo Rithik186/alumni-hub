@@ -1,19 +1,31 @@
 import db from '../config/db.js';
 import { appCache } from '../utils/cache.js';
+import { deleteMediaFromCloudinary } from '../utils/cloudinaryHelper.js';
 
 export const editPost = async (req, res) => {
     const { id } = req.params;
     const { content, image_url, video_url } = req.body;
     const userId = req.user.id;
     try {
-        const post = await db.query('SELECT id, user_id FROM posts WHERE id = $1', [id]);
-        if (post.rows.length === 0) return res.status(404).json({ message: 'Post not found' });
-        if (post.rows[0].user_id !== userId) return res.status(403).json({ message: 'Unauthorized' });
+        const postRes = await db.query('SELECT id, user_id, image_url, video_url FROM posts WHERE id = $1', [id]);
+        if (postRes.rows.length === 0) return res.status(404).json({ message: 'Post not found' });
+        if (postRes.rows[0].user_id !== userId) return res.status(403).json({ message: 'Unauthorized' });
+
+        const oldPost = postRes.rows[0];
+
+        // Cleanup old media if changed
+        if (image_url && oldPost.image_url && image_url !== oldPost.image_url) {
+            await deleteMediaFromCloudinary(oldPost.image_url);
+        }
+        if (video_url && oldPost.video_url && video_url !== oldPost.video_url) {
+            await deleteMediaFromCloudinary(oldPost.video_url);
+        }
 
         const updated = await db.query(
             'UPDATE posts SET content = $1, image_url = $2, video_url = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4 RETURNING *',
             [content, image_url, video_url, id]
         );
+
         res.json(updated.rows[0]);
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -272,16 +284,22 @@ export const deletePost = async (req, res) => {
     const { id } = req.params;
     const userId = req.user.id;
     try {
-        const post = await db.query('SELECT id, user_id FROM posts WHERE id = $1', [id]);
+        const post = await db.query('SELECT id, user_id, image_url, video_url FROM posts WHERE id = $1', [id]);
         if (post.rows.length === 0) {
-            return res.json({ message: 'Post not found' });
+            return res.status(404).json({ message: 'Post not found' });
         }
         // Check ownership
         if (post.rows[0].user_id !== userId) {
             return res.status(403).json({ message: 'Unauthorized' });
         }
+
+        // Cleanup media from Cloudinary
+        if (post.rows[0].image_url) await deleteMediaFromCloudinary(post.rows[0].image_url);
+        if (post.rows[0].video_url) await deleteMediaFromCloudinary(post.rows[0].video_url);
+
         await db.query('DELETE FROM posts WHERE id = $1', [id]);
         res.json({ message: 'Post deleted successfully' });
+
     } catch (err) {
         res.status(500).json({ message: err.message });
     }

@@ -172,25 +172,32 @@ export const loginUser = async (req, res) => {
 // @access  Private
 export const getMe = async (req, res) => {
     try {
+        console.log('--- getMe requested for User ID:', req.user?.id);
         const userRes = await db.query('SELECT id, name, email, phone_number, role, college, profile_picture, is_approved, is_verified, created_at FROM users WHERE id = $1', [req.user.id]);
-        if (userRes.rows.length === 0) return res.status(404).json({ message: 'User not found' });
+        
+        if (userRes.rows.length === 0) {
+            console.warn('--- getMe: User not found in DB');
+            return res.status(404).json({ message: 'User not found' });
+        }
         
         const user = userRes.rows[0];
         let profile = null;
         if (user.role === 'student') {
-            const spRes = await db.query('SELECT user_id, department, register_number, batch, bio, skills FROM student_profiles WHERE user_id = $1', [req.user.id]);
+            const spRes = await db.query('SELECT user_id, department, register_number, batch, skills FROM student_profiles WHERE user_id = $1', [req.user.id]);
             profile = spRes.rows[0];
         } else if (user.role === 'alumni') {
             const apRes = await db.query('SELECT user_id, company, job_role, department, batch, bio, skills, experience_level, mentorship_available FROM alumni_profiles WHERE user_id = $1', [req.user.id]);
             profile = apRes.rows[0];
         }
 
+        console.log('--- getMe: Success for', user.name);
         res.json({ ...user, profile });
     } catch (error) {
-        console.error('Get Me Error:', error);
-        res.status(500).json({ message: 'Server error fetching user details' });
+        console.error('--- getMe CRITICAL Error:', error);
+        res.status(500).json({ message: 'Server error fetching user details', error: error.message });
     }
 };
+
 
 // @desc    Get any user profile by ID
 

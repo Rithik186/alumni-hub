@@ -7,11 +7,11 @@ const { Pool } = pg;
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL ? process.env.DATABASE_URL.trim() : '',
-  // Add some defaults for better reliability
-  max: 5,
+  max: 20, // Increased for performance
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 5000,
+  connectionTimeoutMillis: 10000, // Wait longer for Neon
 });
+
 
 pool.on('connect', () => {
   console.log('Connected to PostgreSQL Database Successfully');

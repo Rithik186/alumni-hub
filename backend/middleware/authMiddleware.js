@@ -28,7 +28,8 @@ export const protect = async (req, res, next) => {
             }
 
             // Check in-memory cache first (avoid DB round-trip)
-            const cached = authCache.get(decoded.id);
+            const cacheKey = String(decoded.id);
+            const cached = authCache.get(cacheKey);
             if (cached && Date.now() < cached.expiry) {
                 req.user = cached.user;
                 return next();
@@ -41,7 +42,8 @@ export const protect = async (req, res, next) => {
             }
 
             const user = userCheck.rows[0];
-            authCache.set(decoded.id, { user, expiry: Date.now() + AUTH_CACHE_TTL });
+            authCache.set(cacheKey, { user, expiry: Date.now() + AUTH_CACHE_TTL });
+
 
             req.user = user; 
             next();

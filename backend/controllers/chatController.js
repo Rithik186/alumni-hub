@@ -1,4 +1,5 @@
 import db from '../config/db.js';
+import { deleteMediaFromCloudinary } from '../utils/cloudinaryHelper.js';
 
 export const getContacts = async (req, res) => {
     const userId = req.user.id;
@@ -134,13 +135,20 @@ export const deleteMessage = async (req, res) => {
     const userId = req.user.id;
     const { id } = req.params;
     try {
-        const checkQuery = `SELECT sender_id FROM messages WHERE id = $1`;
+        const checkQuery = `SELECT sender_id, image_url, video_url, audio_url FROM messages WHERE id = $1`;
         const checkRes = await db.query(checkQuery, [id]);
         if (checkRes.rows.length === 0) return res.status(404).json({ message: 'Message not found' });
         if (checkRes.rows[0].sender_id !== userId) return res.status(403).json({ message: 'Unauthorized' });
 
+        const msg = checkRes.rows[0];
+        // Cleanup media from Cloudinary
+        if (msg.image_url) await deleteMediaFromCloudinary(msg.image_url);
+        if (msg.video_url) await deleteMediaFromCloudinary(msg.video_url);
+        if (msg.audio_url) await deleteMediaFromCloudinary(msg.audio_url);
+
         await db.query(`DELETE FROM messages WHERE id = $1`, [id]);
         res.json({ message: 'Message deleted' });
+
     } catch (err) {
         res.status(500).json({ message: err.message });
     }

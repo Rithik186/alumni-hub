@@ -12,7 +12,13 @@ const uploadProfile = multer({ storage: memoryStorage });
 const uploadPost = multer({ storage: memoryStorage });
 
 // --- Routes --- //
-router.post('/profile-picture', protect, uploadProfile.single('profile_picture'), updateProfilePicture);
+router.post('/profile-picture', protect, (req, res, next) => {
+    console.log('--- Profile Upload Request ---');
+    next();
+}, uploadProfile.single('profile_picture'), updateProfilePicture);
+
 router.post('/media', protect, uploadPost.single('file'), uploadMedia);
+
+
 
 export default router;

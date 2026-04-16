@@ -54,13 +54,18 @@ app.get('/api/health', (req, res) => {
 
 // Error Handling Middleware
 app.use((err, req, res, next) => {
-    console.error('SERVER ERROR:', err.message);
-    console.error(err.stack);
+    console.error('--- GLOBAL SERVER ERROR ---');
+    console.error('Path:', req.path);
+    console.error('Message:', err.message);
+    console.error('Stack:', err.stack);
+    
     res.status(500).json({ 
-        message: 'Something broke!', 
+        message: 'Internal Server Error', 
         error: err.message,
+        path: req.path,
         stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
     });
 });
+
 
 export default app;
